@@ -1,0 +1,30 @@
+build(
+	out zip,
+	out zippath = $zip[Path],
+) {
+	$zip = saker.zip.create(
+		Output: output.zip, 
+		Resources: [
+			{
+				Resources: *.txt,
+			},
+			{
+				Resources: **/*.txt,
+				Directory: dir,
+			},
+			{
+				Resources: *.txt,
+				TargetDirectory: targetdir,
+			},
+			file.direct,
+			directdir/dir.direct,
+			{
+				Files: [
+					target.direct,
+					directdir/dir.direct,
+				],
+				TargetDirectory: directtargetdir,
+			},
+		],
+	)
+}

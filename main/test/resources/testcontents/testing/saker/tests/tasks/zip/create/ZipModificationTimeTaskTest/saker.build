@@ -1,0 +1,12 @@
+build(
+	out zip,
+	out zippath = $zip[Path],
+) {
+	$zip = saker.zip.create(
+		Output: output.zip, 
+		Resources: {
+			Resources: *.txt
+		},
+		ModificationTime: "1999-10-22 12:13:14",
+	)
+}

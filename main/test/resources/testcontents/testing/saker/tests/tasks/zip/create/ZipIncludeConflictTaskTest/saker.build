@@ -1,0 +1,12 @@
+build(
+	out zip,
+	out zippath = $zip[Path],
+) {
+	$zip = saker.zip.create(
+		Output: output.zip, 
+		Include: [
+			first.zip,
+			second.zip,
+		],
+	)
+}

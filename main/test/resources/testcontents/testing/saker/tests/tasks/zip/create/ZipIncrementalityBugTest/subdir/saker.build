@@ -1,0 +1,10 @@
+export(
+){
+	saker.zip.create(
+		Output: "test.jar",
+		Resources: {
+			Directory: api/resources/,
+			Resources: **,
+		},
+	)
+}
