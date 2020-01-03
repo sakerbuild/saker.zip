@@ -1,4 +1,4 @@
 saker.zip-api
 	classpath: [0)
 saker.standard
-	classpath: [0)
+	classpath: 0.8
