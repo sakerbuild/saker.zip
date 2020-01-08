@@ -1,5 +1,7 @@
 # saker.zip
 
+![Build status](https://img.shields.io/azure-devops/build/sakerbuild/de616c64-828e-4ce3-80fa-188c45b0e923/4/master)
+
 Build tasks and supporting classes for the [saker.build system](https://saker.build) for creating ZIP archives during build. The project implements ZIP creation build tasks and provides an API for others to implement ZIP resource transformations.
 
 See the [documentation](https://saker.build/saker.zip/doc/) for more information.
