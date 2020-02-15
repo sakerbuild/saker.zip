@@ -30,6 +30,7 @@ import saker.build.task.identifier.TaskIdentifier;
 import saker.build.task.utils.SimpleStructuredObjectTaskResult;
 import saker.build.task.utils.annot.DataContext;
 import saker.build.task.utils.dependencies.EqualityTaskOutputChangeDetector;
+import saker.build.trace.BuildTrace;
 import saker.nest.scriptinfo.reflection.annot.NestInformation;
 import saker.nest.scriptinfo.reflection.annot.NestParameterInformation;
 import saker.nest.scriptinfo.reflection.annot.NestTaskInformation;
@@ -87,6 +88,9 @@ public class ZipCreateTaskFactory extends FrontendTaskFactory<Object> {
 
 		@Override
 		public Object run(TaskContext taskcontext) throws Exception {
+			if (saker.build.meta.Versions.VERSION_FULL_COMPOUND >= 8_006) {
+				BuildTrace.classifyTask(BuildTrace.CLASSIFICATION_FRONTEND);
+			}
 			ZipCreateDataContext data = this.zipDataContext.clone();
 			SakerPath output = data.outputOption;
 			if (output == null || output.equals(SakerPath.EMPTY)) {

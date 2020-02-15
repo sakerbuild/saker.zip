@@ -34,6 +34,7 @@ import saker.build.file.SakerFile;
 import saker.build.file.content.ContentDescriptor;
 import saker.build.file.path.SakerPath;
 import saker.build.runtime.execution.ExecutionContext;
+import saker.build.runtime.execution.SakerLog;
 import saker.build.task.CommonTaskContentDescriptors;
 import saker.build.task.Task;
 import saker.build.task.TaskContext;
@@ -44,7 +45,9 @@ import saker.std.api.file.location.ExecutionFileLocation;
 import saker.std.api.file.location.FileLocationVisitor;
 import saker.build.thirdparty.saker.util.ImmutableUtils;
 import saker.build.thirdparty.saker.util.ObjectUtils;
+import saker.build.thirdparty.saker.util.io.FileUtils;
 import saker.build.thirdparty.saker.util.io.SerialUtils;
+import saker.build.trace.BuildTrace;
 import saker.zip.api.create.IncludeResourceMapping;
 import saker.zip.api.create.ZipCreatorTaskOutput;
 import saker.zip.api.create.ZipResourceTransformerFactory;
@@ -94,6 +97,16 @@ public class ZipCreateWorkerTaskFactory
 
 	@Override
 	public ZipCreatorTaskOutput run(TaskContext taskcontext) throws Exception {
+		String fn = outputPath.getFileName();
+		String ext = FileUtils.getExtension(fn);
+		if (ObjectUtils.isNullOrEmpty(ext)) {
+			ext = "zip";
+		}
+		if (saker.build.meta.Versions.VERSION_FULL_COMPOUND >= 8_006) {
+			BuildTrace.classifyTask(BuildTrace.CLASSIFICATION_WORKER);
+		}
+		taskcontext.setStandardOutDisplayIdentifier(ext + ":" + fn);
+
 		TaskExecutionUtilities taskutils = taskcontext.getTaskUtilities();
 		SakerDirectory outparentdir = taskutils.resolveDirectoryAtPathCreateIfAbsent(outputPath.getParent());
 		if (outparentdir == null) {
@@ -178,6 +191,8 @@ public class ZipCreateWorkerTaskFactory
 		outparentdir.add(file);
 		file.synchronize();
 		taskutils.reportOutputFileDependency(null, file);
+
+		SakerLog.success().verbose().println("Archive created at: " + outputPath);
 
 		SimpleZipCreatorTaskOutput result = new SimpleZipCreatorTaskOutput(file.getSakerPath());
 		taskcontext.reportSelfTaskOutputChangeDetector(new EqualityTaskOutputChangeDetector(result));
