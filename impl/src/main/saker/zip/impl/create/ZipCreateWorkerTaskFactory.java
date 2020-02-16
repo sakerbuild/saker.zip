@@ -104,6 +104,9 @@ public class ZipCreateWorkerTaskFactory
 		}
 		if (saker.build.meta.Versions.VERSION_FULL_COMPOUND >= 8_006) {
 			BuildTrace.classifyTask(BuildTrace.CLASSIFICATION_WORKER);
+			if (saker.build.meta.Versions.VERSION_FULL_COMPOUND >= 8_007) {
+				BuildTrace.reportOutputArtifact(outputPath, BuildTrace.ARTIFACT_EMBED_DEFAULT);
+			}
 		}
 		taskcontext.setStandardOutDisplayIdentifier(ext + ":" + fn);
 
