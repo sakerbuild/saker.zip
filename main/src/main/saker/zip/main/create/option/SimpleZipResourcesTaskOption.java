@@ -37,6 +37,7 @@ import saker.build.task.utils.dependencies.WildcardFileCollectionStrategy;
 import saker.std.api.file.location.ExecutionFileLocation;
 import saker.std.api.file.location.FileLocation;
 import saker.std.api.file.location.FileLocationVisitor;
+import saker.std.api.util.SakerStandardUtils;
 import saker.std.main.file.option.MultiFileLocationTaskOption;
 import saker.std.main.file.utils.TaskOptionUtils;
 import saker.build.thirdparty.saker.util.ImmutableUtils;
@@ -101,9 +102,7 @@ public class SimpleZipResourcesTaskOption implements ZipResourcesTaskOption {
 				}
 				for (FileLocation flocation : TaskOptionUtils.toFileLocations(flocopt, taskcontext,
 						TaskTags.TASK_INPUT_FILE)) {
-					PathFileNameFileLocationVisitor pathfilenamevisitor = new PathFileNameFileLocationVisitor();
-					flocation.accept(pathfilenamevisitor);
-					taskbuilder.addResource(flocation, targetdir.resolve(pathfilenamevisitor.getFileName()));
+					taskbuilder.addResource(flocation, targetdir.resolve(SakerStandardUtils.getFileLocationFileName(flocation)));
 				}
 			}
 		} else {

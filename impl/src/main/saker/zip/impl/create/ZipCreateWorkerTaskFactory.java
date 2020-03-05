@@ -32,6 +32,7 @@ import saker.build.file.FileHandle;
 import saker.build.file.SakerDirectory;
 import saker.build.file.SakerFile;
 import saker.build.file.content.ContentDescriptor;
+import saker.build.file.content.DirectoryContentDescriptor;
 import saker.build.file.path.SakerPath;
 import saker.build.runtime.execution.ExecutionContext;
 import saker.build.runtime.execution.SakerLog;
@@ -43,6 +44,8 @@ import saker.build.task.TaskFactory;
 import saker.build.task.utils.dependencies.EqualityTaskOutputChangeDetector;
 import saker.std.api.file.location.ExecutionFileLocation;
 import saker.std.api.file.location.FileLocationVisitor;
+import saker.std.api.file.location.LocalFileLocation;
+import saker.std.api.util.SakerStandardUtils;
 import saker.build.thirdparty.saker.util.ImmutableUtils;
 import saker.build.thirdparty.saker.util.ObjectUtils;
 import saker.build.thirdparty.saker.util.io.FileUtils;
@@ -136,7 +139,26 @@ public class ZipCreateWorkerTaskFactory
 						}
 						ContentDescriptor contents = file.getContentDescriptor();
 						taskcontext.reportInputFileDependency(null, filepath, contents);
-						builder.add(resoption.getArchivePath(), file instanceof SakerDirectory ? null : file, contents);
+						FileHandle fhandle = file instanceof SakerDirectory ? null : file;
+						handle(contents, fhandle);
+					}
+
+					@Override
+					public void visit(LocalFileLocation loc) {
+						SakerPath filepath = loc.getLocalPath();
+						ContentDescriptor incd = taskcontext.getTaskUtilities().getReportExecutionDependency(
+								SakerStandardUtils.createLocalFileContentDescriptorExecutionProperty(filepath,
+										taskcontext.getTaskId()));
+						if (incd == null) {
+							//XXX abort instead
+							throw ObjectUtils.sneakyThrow(
+									new FileNotFoundException("File to include in archive not found: " + filepath));
+						}
+						handle(incd, new LocalFileHandle(filepath));
+					}
+
+					private void handle(ContentDescriptor contents, FileHandle fhandle) {
+						builder.add(resoption.getArchivePath(), fhandle, contents);
 					}
 				});
 			}
@@ -159,8 +181,27 @@ public class ZipCreateWorkerTaskFactory
 						ContentDescriptor contents = file.getContentDescriptor();
 						taskcontext.reportInputFileDependency(null, filepath, contents);
 
+						SakerFile fhandle = file;
+						handle(contents, fhandle);
+					}
+
+					@Override
+					public void visit(LocalFileLocation loc) {
+						SakerPath filepath = loc.getLocalPath();
+						ContentDescriptor incd = taskcontext.getTaskUtilities().getReportExecutionDependency(
+								SakerStandardUtils.createLocalFileContentDescriptorExecutionProperty(filepath,
+										taskcontext.getTaskId()));
+						if (incd == null || DirectoryContentDescriptor.INSTANCE.equals(incd)) {
+							//XXX abort instead
+							throw ObjectUtils
+									.sneakyThrow(new FileNotFoundException("Include archive not found: " + filepath));
+						}
+						handle(incd, new LocalFileHandle(filepath));
+					}
+
+					private void handle(ContentDescriptor contents, FileHandle fhandle) {
 						IncludeResourceMapping mapping = incoption.getMapping();
-						includes.compute(file, (f, info) -> {
+						includes.compute(fhandle, (f, info) -> {
 							if (info == null) {
 								return new IncludeInfo(contents, mapping);
 							}

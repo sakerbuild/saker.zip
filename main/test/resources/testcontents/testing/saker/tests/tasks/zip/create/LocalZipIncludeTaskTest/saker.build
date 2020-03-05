@@ -1,0 +1,31 @@
+build(
+	out zip,
+	out zippath = $zip[Path],
+) {
+	$zip = saker.zip.create(
+		Output: output.zip, 
+		Include: [
+			std.file.local(test.include.zip()),
+			{
+				Archive: std.file.local(test.include.zip()),
+				TargetDirectory: inctarget,
+			},
+			{
+				Archive: std.file.local(test.resinclude.zip()),
+				Resources: [
+					*.txt,
+					dir/*.txt
+				],
+			},
+			{
+				Archive: std.file.local(test.dirinclude.zip()),
+				Resources: dir,
+			},
+			{
+				Archive: std.file.local(test.dirinclude.zip()),
+				Resources: dir,
+				TargetDirectory: dirtarget,
+			},
+		],
+	)
+}
