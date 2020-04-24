@@ -273,11 +273,12 @@ public class ZipOutputSakerFile extends SakerFileBase {
 
 		@Override
 		public void transformDirectory(SakerPath entrypath, FileTime modtime) throws IOException {
-			checkEntryDirectoryDuplication(entrypath);
-			ZipEntry addentry = new ZipEntry(entrypath + "/");
-			addentry.setLastModifiedTime(modtime);
-			zipOut.putNextEntry(addentry);
-			zipOut.closeEntry();
+			if (addCheckEntryDirectoryDuplication(entrypath)) {
+				ZipEntry addentry = new ZipEntry(entrypath + "/");
+				addentry.setLastModifiedTime(modtime);
+				zipOut.putNextEntry(addentry);
+				zipOut.closeEntry();
+			}
 		}
 
 		private void checkEntryFileDuplication(SakerPath entrypath) {
@@ -286,12 +287,13 @@ public class ZipOutputSakerFile extends SakerFileBase {
 			}
 		}
 
-		private void checkEntryDirectoryDuplication(SakerPath entrypath) {
+		private boolean addCheckEntryDirectoryDuplication(SakerPath entrypath) {
 			Boolean prev = entries.putIfAbsent(entrypath, Boolean.TRUE);
 			if (prev == Boolean.FALSE) {
 				//already present as a file
 				throw new IllegalArgumentException("Zip file entry already exists for directory: " + entrypath);
 			}
+			return prev == null;
 		}
 	}
 
