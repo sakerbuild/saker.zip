@@ -234,7 +234,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 	}
 
 	private static class NonTransformationContext extends AbstractTransformationContext {
-		private final NavigableSet<SakerPath> entries = new TreeSet<>(SakerPath::compareToIgnoreCase);
+		private final NavigableMap<SakerPath, Boolean> entries = new TreeMap<>(SakerPath::compareToIgnoreCase);
 
 		public NonTransformationContext(ZipOutputStream zipOut) {
 			super(zipOut);
@@ -243,7 +243,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		@Override
 		public void transform(SakerPath entrypath, UnsyncByteArrayOutputStream contentbuffer, FileTime modtime)
 				throws IOException {
-			checkEntryDuplication(entrypath);
+			checkEntryFileDuplication(entrypath);
 			ZipEntry ze = new ZipEntry(entrypath.toString());
 			ze.setLastModifiedTime(modtime);
 			zipOut.putNextEntry(ze);
@@ -253,7 +253,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 
 		@Override
 		public void transform(SakerPath entrypath, InputStream input, FileTime modtime) throws IOException {
-			checkEntryDuplication(entrypath);
+			checkEntryFileDuplication(entrypath);
 			ZipEntry ze = new ZipEntry(entrypath.toString());
 			ze.setLastModifiedTime(modtime);
 			zipOut.putNextEntry(ze);
@@ -263,7 +263,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 
 		@Override
 		public void transform(SakerPath entrypath, FileHandle handle, FileTime modtime) throws IOException {
-			checkEntryDuplication(entrypath);
+			checkEntryFileDuplication(entrypath);
 			ZipEntry ze = new ZipEntry(entrypath.toString());
 			ze.setLastModifiedTime(modtime);
 			zipOut.putNextEntry(ze);
@@ -273,16 +273,24 @@ public class ZipOutputSakerFile extends SakerFileBase {
 
 		@Override
 		public void transformDirectory(SakerPath entrypath, FileTime modtime) throws IOException {
-			checkEntryDuplication(entrypath);
+			checkEntryDirectoryDuplication(entrypath);
 			ZipEntry addentry = new ZipEntry(entrypath + "/");
 			addentry.setLastModifiedTime(modtime);
 			zipOut.putNextEntry(addentry);
 			zipOut.closeEntry();
 		}
 
-		private void checkEntryDuplication(SakerPath entrypath) {
-			if (!entries.add(entrypath)) {
-				throw new IllegalArgumentException("Duplicate zip entry: " + entrypath);
+		private void checkEntryFileDuplication(SakerPath entrypath) {
+			if (entries.putIfAbsent(entrypath, Boolean.FALSE) != null) {
+				throw new IllegalArgumentException("Duplicate zip file entry: " + entrypath);
+			}
+		}
+
+		private void checkEntryDirectoryDuplication(SakerPath entrypath) {
+			Boolean prev = entries.putIfAbsent(entrypath, Boolean.TRUE);
+			if (prev == Boolean.FALSE) {
+				//already present as a file
+				throw new IllegalArgumentException("Zip file entry already exists for directory: " + entrypath);
 			}
 		}
 	}
