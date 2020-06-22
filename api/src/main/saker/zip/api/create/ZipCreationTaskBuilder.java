@@ -45,7 +45,7 @@ public interface ZipCreationTaskBuilder {
 	 * @throws NullPointerException
 	 *             If the argument is <code>null</code>.
 	 * @throws IllegalArgumentException
-	 *             If the argument is not an {@linkplain SakerPath#isAbsolute() absolute} path.
+	 *             If the argument is not an {@linkplain SakerPath#isAbsolute() absolute} path or has no file name.
 	 */
 	public void setOutputPath(SakerPath outputPath) throws NullPointerException, IllegalArgumentException;
 
@@ -89,7 +89,8 @@ public interface ZipCreationTaskBuilder {
 	 * @throws NullPointerException
 	 *             If any of the arguments are <code>null</code>.
 	 * @throws InvalidPathFormatException
-	 *             If the resouces archive path is not {@linkplain SakerPath#isForwardRelative() forward relative}.
+	 *             If the resouces archive path is not {@linkplain SakerPath#isForwardRelative() forward relative} or
+	 *             has no file name.
 	 */
 	public void addResource(FileLocation location, SakerPath archivepath)
 			throws NullPointerException, InvalidPathFormatException;
