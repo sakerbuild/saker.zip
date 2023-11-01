@@ -161,6 +161,8 @@ public final class ZipResourceEntry implements Externalizable {
 	 *            The entry path.
 	 * @param modificationTime
 	 *            The last modification time.
+	 * @param level
+	 *            The compression level.
 	 * @return The new instance.
 	 * @throws NullPointerException
 	 *             If the entry path is <code>null</code>.
