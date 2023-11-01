@@ -19,16 +19,16 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.Objects;
 
 import saker.build.file.path.SakerPath;
 import saker.std.api.file.location.FileLocation;
 import saker.zip.api.create.ZipResourceEntry;
 
-public class ZipResourceOption implements Externalizable {
+public abstract class ZipResourceOption implements Externalizable {
 	private static final long serialVersionUID = 1L;
 
-	private FileLocation fileLocation;
-	private SakerPath archivePath;
+	protected FileLocation fileLocation;
 
 	/**
 	 * For {@link Externalizable}.
@@ -36,42 +36,37 @@ public class ZipResourceOption implements Externalizable {
 	public ZipResourceOption() {
 	}
 
-	public ZipResourceOption(FileLocation filePath, SakerPath archivePath) {
+	public ZipResourceOption(FileLocation filePath) {
 		this.fileLocation = filePath;
-		this.archivePath = archivePath;
+	}
+
+	public static ZipResourceOption create(FileLocation filePath, SakerPath archivePath) {
+		return new PathZipResourceOption(filePath, archivePath);
+	}
+
+	public static ZipResourceOption create(FileLocation filePath, ZipResourceEntry resourceEntry) {
+		return new ResourceEntryZipResourceOption(filePath, resourceEntry);
 	}
 
 	public FileLocation getFileLocation() {
 		return fileLocation;
 	}
 
-	public SakerPath getArchivePath() {
-		return archivePath;
-	}
-
-	public ZipResourceEntry getArchiveResourceEntry() {
-		return ZipResourceEntry.create(archivePath);
-	}
+	public abstract ZipResourceEntry getArchiveResourceEntry();
 
 	@Override
 	public void writeExternal(ObjectOutput out) throws IOException {
 		out.writeObject(fileLocation);
-		out.writeObject(archivePath);
 	}
 
 	@Override
 	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
 		fileLocation = (FileLocation) in.readObject();
-		archivePath = (SakerPath) in.readObject();
 	}
 
 	@Override
 	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + ((archivePath == null) ? 0 : archivePath.hashCode());
-		result = prime * result + ((fileLocation == null) ? 0 : fileLocation.hashCode());
-		return result;
+		return Objects.hashCode(fileLocation);
 	}
 
 	@Override
@@ -83,11 +78,6 @@ public class ZipResourceOption implements Externalizable {
 		if (getClass() != obj.getClass())
 			return false;
 		ZipResourceOption other = (ZipResourceOption) obj;
-		if (archivePath == null) {
-			if (other.archivePath != null)
-				return false;
-		} else if (!archivePath.equals(other.archivePath))
-			return false;
 		if (fileLocation == null) {
 			if (other.fileLocation != null)
 				return false;
@@ -98,8 +88,10 @@ public class ZipResourceOption implements Externalizable {
 
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() + "[" + (fileLocation != null ? "filePath=" + fileLocation + ", " : "")
-				+ (archivePath != null ? "archivePath=" + archivePath : "") + "]";
+		StringBuilder builder = new StringBuilder(getClass().getSimpleName());
+		builder.append("[fileLocation=");
+		builder.append(fileLocation);
+		builder.append("]");
+		return builder.toString();
 	}
-
 }

@@ -95,6 +95,9 @@ public interface ZipCreationTaskBuilder {
 	public void addResource(FileLocation location, SakerPath archivepath)
 			throws NullPointerException, InvalidPathFormatException;
 
+	public void addResource(FileLocation location, ZipResourceEntry resourceentry)
+			throws NullPointerException, InvalidPathFormatException;
+
 	/**
 	 * Adds a resource transformer to the ZIP creation task.
 	 * <p>

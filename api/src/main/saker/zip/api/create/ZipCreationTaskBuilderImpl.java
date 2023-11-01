@@ -75,9 +75,26 @@ final class ZipCreationTaskBuilderImpl implements ZipCreationTaskBuilder {
 			throw new InvalidPathFormatException("Resource archive path must be forward relative: " + archivepath);
 		}
 		if (archivepath.getFileName() == null) {
-			throw new InvalidPathFormatException("Resource archive path has not file name: " + archivepath);
+			throw new InvalidPathFormatException("Resource archive path has no file name: " + archivepath);
 		}
-		this.resourceOptions.add(new ZipResourceOption(location, archivepath));
+		this.resourceOptions.add(ZipResourceOption.create(location, archivepath));
+	}
+
+	@Override
+	public void addResource(FileLocation location, ZipResourceEntry resourceentry)
+			throws NullPointerException, InvalidPathFormatException {
+		Objects.requireNonNull(location, "location");
+		Objects.requireNonNull(resourceentry, "resource entry");
+
+		SakerPath archivepath = resourceentry.getEntryPath();
+		if (!archivepath.isForwardRelative()) {
+			throw new InvalidPathFormatException("Resource archive path must be forward relative: " + archivepath);
+		}
+		if (archivepath.getFileName() == null) {
+			throw new InvalidPathFormatException("Resource archive path has no file name: " + archivepath);
+		}
+
+		this.resourceOptions.add(ZipResourceOption.create(location, resourceentry));
 	}
 
 	@Override
