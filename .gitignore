@@ -1,5 +1,4 @@
-secret/**
-!secret/readme.md
+/maintainer-private/
 /build/
 /.classpath
 /.project
