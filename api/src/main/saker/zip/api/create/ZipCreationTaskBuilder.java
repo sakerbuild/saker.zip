@@ -109,8 +109,13 @@ public interface ZipCreationTaskBuilder {
 	 *             has no file name.
 	 * @since saker.zip 0.8.5
 	 */
-	public void addResource(FileLocation location, ZipResourceEntry resourceentry)
-			throws NullPointerException, InvalidPathFormatException;
+	public default void addResource(FileLocation location, ZipResourceEntry resourceentry)
+			throws NullPointerException, InvalidPathFormatException {
+		//default implementation that ignores the resource entry properties, and forwards the path to the
+		//previous addResource function
+		//this is so clients that implement this interface for whatever reason stay compatible
+		addResource(location, resourceentry.getEntryPath());
+	}
 
 	/**
 	 * Adds a resource transformer to the ZIP creation task.
