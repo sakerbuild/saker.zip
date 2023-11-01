@@ -2,6 +2,7 @@ package saker.zip.api.create;
 
 import java.nio.file.attribute.FileTime;
 import java.util.Objects;
+import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import saker.build.file.path.SakerPath;
@@ -13,27 +14,49 @@ public final class ZipResourceEntry {
 	protected int method;
 	protected int level;
 
-	public ZipResourceEntry(SakerPath entryPath) {
-		Objects.requireNonNull(entryPath, "entryPath");
-		this.entryPath = entryPath;
-		this.method = -1;
-		this.level = -1;
-	}
-
-	public ZipResourceEntry(SakerPath entryPath, FileTime modificationTime) {
-		Objects.requireNonNull(entryPath, "entryPath");
-		this.entryPath = entryPath;
-		this.modificationTime = modificationTime;
-		this.method = -1;
-		this.level = -1;
-	}
-
-	public ZipResourceEntry(SakerPath entryPath, FileTime modificationTime, int method, int level) {
+	private ZipResourceEntry(SakerPath entryPath, FileTime modificationTime, int method, int level) {
 		Objects.requireNonNull(entryPath, "entryPath");
 		this.entryPath = entryPath;
 		this.modificationTime = modificationTime;
 		this.method = method;
 		this.level = level;
+	}
+
+	public static ZipResourceEntry create(SakerPath entrypath) {
+		return new ZipResourceEntry(entrypath, null, -1, -1);
+	}
+
+	public static ZipResourceEntry create(SakerPath entrypath, FileTime modificationTime) {
+		return new ZipResourceEntry(entrypath, modificationTime, -1, -1);
+	}
+
+	public static ZipResourceEntry stored(SakerPath entrypath) {
+		return new ZipResourceEntry(entrypath, null, ZipEntry.STORED, -1);
+	}
+
+	public static ZipResourceEntry stored(SakerPath entrypath, FileTime modificationTime) {
+		return new ZipResourceEntry(entrypath, modificationTime, ZipEntry.STORED, -1);
+	}
+
+	public static ZipResourceEntry deflated(SakerPath entrypath) {
+		return new ZipResourceEntry(entrypath, null, ZipEntry.DEFLATED, -1);
+	}
+
+	public static ZipResourceEntry deflated(SakerPath entrypath, FileTime modificationTime) {
+		return new ZipResourceEntry(entrypath, modificationTime, ZipEntry.DEFLATED, -1);
+	}
+
+	public static ZipResourceEntry deflated(SakerPath entrypath, int level) {
+		return new ZipResourceEntry(entrypath, null, ZipEntry.DEFLATED, level);
+	}
+
+	public static ZipResourceEntry deflated(SakerPath entrypath, FileTime modificationTime, int level) {
+		return new ZipResourceEntry(entrypath, modificationTime, ZipEntry.DEFLATED, level);
+	}
+
+	public static ZipResourceEntry from(ZipEntry zipentry) {
+		return new ZipResourceEntry(SakerPath.valueOf(zipentry.getName()), zipentry.getLastModifiedTime(),
+				zipentry.getMethod(), -1);
 	}
 
 	public SakerPath getEntryPath() {

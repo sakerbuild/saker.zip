@@ -45,11 +45,11 @@ public class SimpleDirectZipCreateTest extends SakerTestCase {
 			//round to sec
 			FileTime modtime = FileTime.fromMillis(System.currentTimeMillis() / 1000 * 1000);
 			ZipOutputSakerFile.Builder builder = ZipOutputSakerFile.builder();
-			builder.add(new ZipResourceEntry(SakerPath.valueOf("readme.txt"), modtime),
+			builder.add(ZipResourceEntry.create(SakerPath.valueOf("readme.txt"), modtime),
 					ZipCreatorUtils.byteFileHandle("readme"));
-			builder.add(new ZipResourceEntry(SakerPath.valueOf("dir/sub.txt"), modtime, ZipEntry.STORED, -1),
+			builder.add(ZipResourceEntry.stored(SakerPath.valueOf("dir/sub.txt"), modtime),
 					ZipCreatorUtils.byteFileHandle("sub"));
-			builder.add(new ZipResourceEntry(SakerPath.valueOf("mydir"), modtime), null,
+			builder.add(ZipResourceEntry.create(SakerPath.valueOf("mydir"), modtime), null,
 					DirectoryContentDescriptor.INSTANCE);
 			SakerFile file = builder.build("test.zip");
 

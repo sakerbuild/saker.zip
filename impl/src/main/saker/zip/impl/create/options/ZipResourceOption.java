@@ -48,9 +48,9 @@ public class ZipResourceOption implements Externalizable {
 	public SakerPath getArchivePath() {
 		return archivePath;
 	}
-	
+
 	public ZipResourceEntry getArchiveResourceEntry() {
-		return new ZipResourceEntry(archivePath);
+		return ZipResourceEntry.create(archivePath);
 	}
 
 	@Override

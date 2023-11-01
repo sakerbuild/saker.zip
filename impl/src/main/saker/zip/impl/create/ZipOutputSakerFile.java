@@ -87,7 +87,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		//null file if directory
 		@Deprecated
 		public default void add(SakerPath path, FileHandle file, ContentDescriptor content) {
-			this.add(new ZipResourceEntry(path), file, content);
+			this.add(ZipResourceEntry.create(path), file, content);
 		}
 
 		//null file if directory
@@ -519,7 +519,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 
 		@Override
 		public void appendDirectory(SakerPath entrypath, FileTime modificationtime) {
-			appendDirectory(new ZipResourceEntry(entrypath, modificationtime));
+			appendDirectory(ZipResourceEntry.create(entrypath, modificationtime));
 		}
 
 		@Override
@@ -533,7 +533,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		@Override
 		public OutputStream appendFile(SakerPath entrypath, FileTime modificationtime) {
 			Objects.requireNonNull(entrypath, "entry path");
-			return appendFile(new ZipResourceEntry(entrypath, modificationtime));
+			return appendFile(ZipResourceEntry.create(entrypath, modificationtime));
 		}
 
 		@Override
@@ -758,13 +758,10 @@ public class ZipOutputSakerFile extends SakerFileBase {
 			try (InputStream archivein = handle.openInputStream();
 					ZipInputStream zis = new ZipInputStream(archivein)) {
 				for (ZipEntry ze; (ze = zis.getNextEntry()) != null;) {
-					String name = ze.getName();
 					boolean directory = ze.isDirectory();
 
-					SakerPath path = SakerPath.valueOf(name);
-
-					ZipResourceEntry zipresourceentry = new ZipResourceEntry(path, ze.getLastModifiedTime(),
-							ze.getMethod(), -1);
+					ZipResourceEntry zipresourceentry = ZipResourceEntry.from(ze);
+					SakerPath path = zipresourceentry.getEntryPath();
 
 					Collection<? extends ZipResourceEntry> addentrypaths = inc.mapResource(zipresourceentry, directory);
 					if (ObjectUtils.isNullOrEmpty(addentrypaths)) {

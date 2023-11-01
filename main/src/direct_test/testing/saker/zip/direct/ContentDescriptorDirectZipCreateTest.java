@@ -2,7 +2,6 @@ package testing.saker.zip.direct;
 
 import java.nio.file.attribute.FileTime;
 import java.util.Map;
-import java.util.zip.ZipEntry;
 
 import saker.build.file.content.ContentDescriptor;
 import saker.build.file.path.SakerPath;
@@ -29,19 +28,19 @@ public class ContentDescriptorDirectZipCreateTest extends SakerTestCase {
 		}
 		{
 			ZipOutputSakerFile.Builder builder = ZipOutputSakerFile.builder();
-			builder.add(new ZipResourceEntry(SakerPath.valueOf("readme.txt")),
+			builder.add(ZipResourceEntry.create(SakerPath.valueOf("readme.txt")),
 					ZipCreatorUtils.byteFileHandle("readme"));
 			contententrydefault = builder.build("test.zip").getContentDescriptor();
 		}
 		{
 			ZipOutputSakerFile.Builder builder = ZipOutputSakerFile.builder();
-			builder.add(new ZipResourceEntry(SakerPath.valueOf("readme.txt"),
+			builder.add(ZipResourceEntry.create(SakerPath.valueOf("readme.txt"),
 					FileTime.fromMillis(System.currentTimeMillis())), ZipCreatorUtils.byteFileHandle("readme"));
 			contentmodtime = builder.build("test.zip").getContentDescriptor();
 		}
 		{
 			ZipOutputSakerFile.Builder builder = ZipOutputSakerFile.builder();
-			builder.add(new ZipResourceEntry(SakerPath.valueOf("readme.txt"), null, ZipEntry.STORED, -1),
+			builder.add(ZipResourceEntry.stored(SakerPath.valueOf("readme.txt")),
 					ZipCreatorUtils.byteFileHandle("readme"));
 			contentstoredmethod = builder.build("test.zip").getContentDescriptor();
 		}
