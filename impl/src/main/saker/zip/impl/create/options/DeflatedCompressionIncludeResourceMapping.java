@@ -32,6 +32,17 @@ import saker.zip.api.create.ZipResourceEntry;
 public final class DeflatedCompressionIncludeResourceMapping implements IncludeResourceMapping, Externalizable {
 	private static final long serialVersionUID = 1L;
 
+	/**
+	 * Cache with levels from -1 to 9
+	 */
+	private static final DeflatedCompressionIncludeResourceMapping[] CACHE = new DeflatedCompressionIncludeResourceMapping[11];
+
+	static {
+		for (int i = 0; i < CACHE.length; i++) {
+			CACHE[i] = new DeflatedCompressionIncludeResourceMapping(i - 1);
+		}
+	}
+
 	private int level;
 
 	/**
@@ -40,16 +51,18 @@ public final class DeflatedCompressionIncludeResourceMapping implements IncludeR
 	public DeflatedCompressionIncludeResourceMapping() {
 	}
 
-	public DeflatedCompressionIncludeResourceMapping(int level) {
-		if (level < -1) {
-			//normalize negative level to -1
-			level = -1;
-		}
+	private DeflatedCompressionIncludeResourceMapping(int level) {
 		this.level = level;
 	}
 
 	public static DeflatedCompressionIncludeResourceMapping get(int level) {
-		//XXX maybe some caching?
+		if (level < -1) {
+			//normalize negative level to -1
+			level = -1;
+		}
+		if (level <= 9) {
+			return CACHE[level + 1];
+		}
 		return new DeflatedCompressionIncludeResourceMapping(level);
 	}
 

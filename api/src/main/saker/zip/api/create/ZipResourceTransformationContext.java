@@ -43,6 +43,17 @@ public interface ZipResourceTransformationContext {
 	 */
 	public void appendDirectory(SakerPath entrypath, FileTime modificationtime) throws NullPointerException;
 
+	/**
+	 * Adds a directory entry to the created ZIP archive.
+	 * <p>
+	 * The added entry will be subject to further processing.
+	 * 
+	 * @param resourceentry
+	 *            The ZIP resource entry describing the directory.
+	 * @throws NullPointerException
+	 *             If argument is <code>null</code>.
+	 * @since saker.zip 0.8.5
+	 */
 	public void appendDirectory(ZipResourceEntry resourceentry) throws NullPointerException;
 
 	/**
@@ -67,5 +78,23 @@ public interface ZipResourceTransformationContext {
 	 */
 	public OutputStream appendFile(SakerPath entrypath, FileTime modificationtime) throws NullPointerException;
 
-	public OutputStream appendFile(ZipResourceEntry resourceentry)throws NullPointerException;
+	/**
+	 * Adds a file entry to the created ZIP archive.
+	 * <p>
+	 * The contents of the file should be written to the returned output stream.
+	 * <p>
+	 * <b>The stream must be closed by the caller.</b> If it is not closed, the entry will not be written to the
+	 * archive.
+	 * <p>
+	 * The added entry will be subject to further processing.
+	 * 
+	 * @param resourceentry
+	 *            The ZIP resource entry describing the file.
+	 * @return The output stream to which the contents of the file should be written to. The stream must be closed by
+	 *             the caller.
+	 * @throws NullPointerException
+	 *             If argument is <code>null</code>.
+	 * @since saker.zip 0.8.5
+	 */
+	public OutputStream appendFile(ZipResourceEntry resourceentry) throws NullPointerException;
 }

@@ -82,6 +82,49 @@ public interface ZipResourceTransformer {
 	public boolean process(ZipResourceTransformationContext context, SakerPath resourcepath, InputStream resourceinput)
 			throws IOException;
 
+	/**
+	 * Processes the ZIP resource specified by the arguments.
+	 * <p>
+	 * This method is called by the ZIP archiver to ask the transformer to process the specified resource. The
+	 * transformer can either consume the resource or not.
+	 * <p>
+	 * When a resource is consumed, it will not be passed to subsequent transformers, and will not be written to the ZIP
+	 * archive output.
+	 * <p>
+	 * The transformers can decide to consume the resource, and write a resource to the archive using the transformation
+	 * context.
+	 * <p>
+	 * If the transformer doesn't consume the resource, subsequent transformers will be asked to process it. If no
+	 * transformer consumes the resource, it will be written to the archive as is.
+	 * <p>
+	 * Implementations should take care to implement guarding when they process and generate a resource with the same
+	 * name. Not employing guarding may result in infinite looping by the transformation context.
+	 * <p>
+	 * Transformers are also allowed to return a different {@link ZipResourceEntry} instance from this method which
+	 * allows to change the attributes of the written resource. E.g. an implementation can use
+	 * {@link ZipResourceEntry#withEntryPath(SakerPath)} to change the entry path of the resource and return this new
+	 * instance.
+	 * <p>
+	 * If the transformer doesn't modify the resource in any way, it can simply return the argument
+	 * {@link ZipResourceEntry}.
+	 * <p>
+	 * The default implementation calls the previous
+	 * {@link #process(ZipResourceTransformationContext, SakerPath, InputStream) process} method (which is already
+	 * deprecated).
+	 * 
+	 * @param context
+	 *            The transformation context.
+	 * @param resourceentry
+	 *            The ZIP resource entry describing the data.
+	 * @param resourceinput
+	 *            The input stream to the resource bytes, or <code>null</code> if the resource is a directory.
+	 * @return <code>nulolo</code> if the resource is consumed by this transformer, and shouldn't be written to the
+	 *             output. Non-<code>null</code> if the transformer doesn't consume this resource and it should be
+	 *             written with the attributes from the returned entry.
+	 * @throws IOException
+	 *             Transformers may throw in case of errors.
+	 * @since saker.zip 0.8.5
+	 */
 	public default ZipResourceEntry process(ZipResourceTransformationContext context, ZipResourceEntry resourceentry,
 			InputStream resourceinput) throws IOException {
 		return process(context, resourceentry.getEntryPath(), resourceinput) ? null : resourceentry;

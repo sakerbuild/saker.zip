@@ -89,12 +89,26 @@ public interface ZipCreationTaskBuilder {
 	 * @throws NullPointerException
 	 *             If any of the arguments are <code>null</code>.
 	 * @throws InvalidPathFormatException
-	 *             If the resouces archive path is not {@linkplain SakerPath#isForwardRelative() forward relative} or
+	 *             If the resource archive path is not {@linkplain SakerPath#isForwardRelative() forward relative} or
 	 *             has no file name.
 	 */
 	public void addResource(FileLocation location, SakerPath archivepath)
 			throws NullPointerException, InvalidPathFormatException;
 
+	/**
+	 * Adds a file to be added to the created archive.
+	 * 
+	 * @param location
+	 *            The location of the file.
+	 * @param resourceentry
+	 *            The ZIP resource entry describing the archive entry.
+	 * @throws NullPointerException
+	 *             If any of the arguments are <code>null</code>.
+	 * @throws InvalidPathFormatException
+	 *             If the resource archive path is not {@linkplain SakerPath#isForwardRelative() forward relative} or
+	 *             has no file name.
+	 * @since saker.zip 0.8.5
+	 */
 	public void addResource(FileLocation location, ZipResourceEntry resourceentry)
 			throws NullPointerException, InvalidPathFormatException;
 

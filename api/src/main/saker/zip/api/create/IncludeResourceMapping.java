@@ -18,14 +18,17 @@ package saker.zip.api.create;
 import java.io.Externalizable;
 import java.util.Collection;
 import java.util.Set;
+import java.util.zip.ZipEntry;
 
 import saker.build.exception.InvalidPathFormatException;
 import saker.build.file.path.SakerPath;
 import saker.build.file.path.WildcardPath;
 import saker.std.api.file.location.FileLocation;
 import saker.zip.impl.create.options.ChainIncludeResourceMapping;
+import saker.zip.impl.create.options.DeflatedCompressionIncludeResourceMapping;
 import saker.zip.impl.create.options.IdentityIncludeResourceMapping;
 import saker.zip.impl.create.options.MultiIncludeResourceMapping;
+import saker.zip.impl.create.options.StoredCompressionIncludeResourceMapping;
 import saker.zip.impl.create.options.TargetDirectoryIncludeResourceMapping;
 import saker.zip.impl.create.options.WildcardFilterIncludeResourceMapping;
 
@@ -176,5 +179,38 @@ public interface IncludeResourceMapping {
 	 */
 	public static IncludeResourceMapping wildcardIncludeFilter(WildcardPath wildcard) throws NullPointerException {
 		return new WildcardFilterIncludeResourceMapping(wildcard);
+	}
+
+	/**
+	 * Gets a resource mapping that changes the compression method to {@link ZipEntry#STORED stored} (uncompressed).
+	 * 
+	 * @return The resource mapping.
+	 * @since saker.zip 0.8.5
+	 */
+	public static IncludeResourceMapping storedCompressionMethod() {
+		return StoredCompressionIncludeResourceMapping.INSTANCE;
+	}
+
+	/**
+	 * Gets a resource mapping that changes the compression method to {@link ZipEntry#DEFLATED deflated}.
+	 * 
+	 * @return The resource mapping.
+	 * @since saker.zip 0.8.5
+	 */
+	public static IncludeResourceMapping deflatedCompressionMethod() {
+		return DeflatedCompressionIncludeResourceMapping.get(-1);
+	}
+
+	/**
+	 * Gets a resource mapping that changes the compression method to {@link ZipEntry#DEFLATED deflated} with the
+	 * specified compression level.
+	 * 
+	 * @param level
+	 *            The compression level.
+	 * @return The resource mapping.
+	 * @since saker.zip 0.8.5
+	 */
+	public static IncludeResourceMapping deflatedCompressionMethod(int level) {
+		return DeflatedCompressionIncludeResourceMapping.get(-1);
 	}
 }
