@@ -1,0 +1,39 @@
+build(
+	out zip,
+	out zippath = $zip[Path],
+) {
+	$zip = saker.zip.create(
+		Output: output.zip, 
+		Include: [
+			{
+				Archive: default.zip
+			}
+			# include stored.zip multiple times for sanity check
+			{
+				Archive: stored.zip
+				Compression: STORED
+			}
+			{
+				Archive: stored.zip
+				Compression: {
+					Method: STORED
+				}
+				TargetDirectory: st2
+			}
+			
+			{
+				Archive: deflated.zip
+				Compression: DEFLATED
+			}
+			
+			{
+				Archive: fromstored.zip
+			}
+			{
+				Archive: fromstored.zip
+				Compression: 9 # deflated compression level
+				TargetDirectory: fs2
+			}
+		]
+	)
+}

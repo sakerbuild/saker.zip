@@ -292,13 +292,13 @@ public class ZipOutputSakerFile extends SakerFileBase {
 			}
 		}
 
-		public abstract void transform(ZipResourceEntry resourceentry, FileHandle handle) throws IOException;
-
 		public abstract void transform(ZipResourceEntry resourceentry, ZipEntry entry,
 				UnsyncByteArrayOutputStream contentbuffer) throws IOException;
 
 		public abstract void transform(ZipResourceEntry resourceentry, ZipEntry entry, InputStream input)
 				throws IOException;
+
+		public abstract void transform(ZipResourceEntry resourceentry, FileHandle handle) throws IOException;
 
 		public abstract void transform(ZipResourceEntry entry, InputStream input) throws IOException;
 
@@ -319,41 +319,46 @@ public class ZipOutputSakerFile extends SakerFileBase {
 				throws IOException {
 			SakerPath entrypath = resourceentry.getEntryPath();
 			checkEntryFileDuplication(entrypath);
-			putNextEntry(entrypath.toString(), resourceentry, entry);
+
+			ZipEntry ze = createNextEntry(entrypath.toString(), resourceentry);
+			updateCompression(ze, resourceentry.getMethod(), resourceentry.getLevel());
+			if (ze.getMethod() == ZipEntry.STORED) {
+				long zcrc = entry.getCrc();
+				if (zcrc < 0) {
+					CRC32 crc = getCrc();
+					int size = buffer.size();
+					crc.update(buffer.getBuffer(), 0, size);
+					zcrc = crc.getValue();
+				}
+				ze.setCrc(zcrc);
+				ze.setSize(contentbuffer.size());
+			}
+
+			zipOut.putNextEntry(ze);
 			contentbuffer.writeTo(zipOut);
 			zipOut.closeEntry();
-		}
-
-		@Override
-		public void transform(ZipResourceEntry resourceentry, InputStream input) throws IOException {
-			SakerPath entrypath = resourceentry.getEntryPath();
-			checkEntryFileDuplication(entrypath);
-			ZipEntry ze = createNextEntry(entrypath.toString(), resourceentry);
-			UnsyncByteArrayOutputStream buffer = this.buffer;
-			if (ze.getMethod() == ZipEntry.STORED) {
-				buffer.reset();
-				buffer.readFrom(input);
-				CRC32 crc = getCrc();
-				int size = buffer.size();
-				crc.update(buffer.getBuffer(), 0, size);
-
-				ze.setCrc(crc.getValue());
-				ze.setSize(size);
-				zipOut.putNextEntry(ze);
-				buffer.writeTo(zipOut);
-			} else {
-				zipOut.putNextEntry(ze);
-				StreamUtils.copyStream(input, zipOut, buffer.getBuffer());
-			}
-			zipOut.closeEntry();
-
 		}
 
 		@Override
 		public void transform(ZipResourceEntry resourceentry, ZipEntry entry, InputStream input) throws IOException {
 			SakerPath entrypath = resourceentry.getEntryPath();
 			checkEntryFileDuplication(entrypath);
-			putNextEntry(entrypath.toString(), resourceentry, entry);
+
+			ZipEntry ze = createNextEntry(entrypath.toString(), resourceentry);
+			updateCompression(ze, resourceentry.getMethod(), resourceentry.getLevel());
+			if (ze.getMethod() == ZipEntry.STORED) {
+				long zcrc = entry.getCrc();
+				long zsize = entry.getSize();
+				if (zcrc < 0 || zsize < 0) {
+					//if we need to do the calculation, reuse the code with the other function
+					transformStoredStream(input, ze);
+					return;
+				}
+				ze.setCrc(zcrc);
+				ze.setSize(zsize);
+			}
+
+			zipOut.putNextEntry(ze);
 			StreamUtils.copyStream(input, zipOut, buffer.getBuffer());
 			zipOut.closeEntry();
 		}
@@ -364,6 +369,8 @@ public class ZipOutputSakerFile extends SakerFileBase {
 			checkEntryFileDuplication(entrypath);
 
 			ZipEntry ze = createNextEntry(entrypath.toString(), resourceentry);
+			updateCompression(ze, resourceentry.getMethod(), resourceentry.getLevel());
+
 			if (ze.getMethod() == ZipEntry.STORED) {
 				UnsyncByteArrayOutputStream buffer = this.buffer;
 				buffer.reset();
@@ -386,6 +393,43 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		}
 
 		@Override
+		public void transform(ZipResourceEntry resourceentry, InputStream input) throws IOException {
+			SakerPath entrypath = resourceentry.getEntryPath();
+			checkEntryFileDuplication(entrypath);
+
+			ZipEntry ze = createNextEntry(entrypath.toString(), resourceentry);
+			updateCompression(ze, resourceentry.getMethod(), resourceentry.getLevel());
+
+			transformStream(input, ze);
+		}
+
+		private void transformStream(InputStream input, ZipEntry ze) throws IOException {
+			if (ze.getMethod() == ZipEntry.STORED) {
+				transformStoredStream(input, ze);
+			} else {
+				zipOut.putNextEntry(ze);
+				StreamUtils.copyStream(input, zipOut, buffer.getBuffer());
+				zipOut.closeEntry();
+			}
+		}
+
+		private void transformStoredStream(InputStream input, ZipEntry ze) throws IOException {
+			UnsyncByteArrayOutputStream buffer = this.buffer;
+			buffer.reset();
+			buffer.readFrom(input);
+			CRC32 crc = getCrc();
+			int size = buffer.size();
+			crc.update(buffer.getBuffer(), 0, size);
+
+			ze.setCrc(crc.getValue());
+			ze.setSize(size);
+
+			zipOut.putNextEntry(ze);
+			buffer.writeTo(zipOut);
+			zipOut.closeEntry();
+		}
+
+		@Override
 		public void transformDirectory(ZipResourceEntry entry) throws IOException {
 			SakerPath entrypath = entry.getEntryPath();
 			if (addCheckEntryDirectoryDuplication(entrypath)) {
@@ -399,18 +443,6 @@ public class ZipOutputSakerFile extends SakerFileBase {
 				zipOut.closeEntry();
 			}
 
-		}
-
-		private void putNextEntry(String entrypath, ZipResourceEntry resourceentry, ZipEntry entry) throws IOException {
-			ZipEntry ze = createNextEntry(entrypath, resourceentry);
-
-			if (ze.getMethod() == ZipEntry.STORED) {
-				//these need to be set in case of stored
-				ze.setCrc(entry.getCrc());
-				ze.setSize(entry.getSize());
-			}
-
-			zipOut.putNextEntry(ze);
 		}
 
 		private ZipEntry createNextEntry(String entrypath, ZipResourceEntry resourceentry) {
@@ -558,13 +590,6 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		}
 
 		@Override
-		public void transform(ZipResourceEntry resourceentry, FileHandle handle) throws IOException {
-			try (InputStream is = handle.openInputStream()) {
-				transform(resourceentry, is);
-			}
-		}
-
-		@Override
 		public void transform(ZipResourceEntry resourceentry, ZipEntry zipentry,
 				UnsyncByteArrayOutputStream contentbuffer) throws IOException {
 			try (UnsyncByteArrayInputStream is = new UnsyncByteArrayInputStream(contentbuffer.toByteArrayRegion())) {
@@ -586,6 +611,13 @@ public class ZipOutputSakerFile extends SakerFileBase {
 			transformSingleEntryImpl(entry, null, null);
 
 			executePendingTransformations();
+		}
+
+		@Override
+		public void transform(ZipResourceEntry resourceentry, FileHandle handle) throws IOException {
+			try (InputStream is = handle.openInputStream()) {
+				transform(resourceentry, is);
+			}
 		}
 
 		@Override
@@ -674,12 +706,13 @@ public class ZipOutputSakerFile extends SakerFileBase {
 			updateCompression(ze, method, entry.getLevel());
 			if (method == ZipEntry.STORED) {
 				//these need to be set in case of stored
-				if (zipentry != null) {
-					ze.setCrc(zipentry.getCrc());
-					ze.setSize(zipentry.getSize());
-				} else if (input == null) {
+				if (input == null) {
 					ze.setCrc(0);
 					ze.setSize(0);
+				} else if (zipentry != null && zipentry.getCrc() >= 0 && zipentry.getSize() >= 0) {
+					//set the crc and size from the zip entry, if both are available, otherwise we will need to calculate them
+					ze.setCrc(zipentry.getCrc());
+					ze.setSize(zipentry.getSize());
 				} else {
 					//we need to read the data and calculate the length and crc
 					CRC32 crc = getCrc();

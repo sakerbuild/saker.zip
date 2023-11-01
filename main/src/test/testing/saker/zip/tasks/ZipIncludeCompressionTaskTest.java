@@ -25,24 +25,33 @@ import saker.build.file.path.SakerPath;
 import saker.build.file.path.WildcardPath;
 import saker.build.thirdparty.saker.util.io.ByteArrayRegion;
 import testing.saker.SakerTest;
+import testing.saker.build.tests.TestUtils;
 import testing.saker.nest.util.RepositoryLoadingVariablesMetricEnvironmentTestCase;
 import testing.saker.zip.test.utils.ZipCreatorUtils;
 
 @SakerTest
-public class ZipResourcesCompressionTaskTest extends RepositoryLoadingVariablesMetricEnvironmentTestCase {
+public class ZipIncludeCompressionTaskTest extends RepositoryLoadingVariablesMetricEnvironmentTestCase {
 	@Override
 	protected void runTestImpl() throws Throwable {
+		files.putFile(PATH_WORKING_DIRECTORY.resolve("default.zip"),
+				ZipCreatorUtils.getZipBytes(TestUtils.<String, String>treeMapBuilder().put("default", "def").build()));
+
+		files.putFile(PATH_WORKING_DIRECTORY.resolve("stored.zip"),
+				ZipCreatorUtils.getZipBytes(TestUtils.<String, String>treeMapBuilder().put("stored", "str").build()));
+
+		files.putFile(PATH_WORKING_DIRECTORY.resolve("deflated.zip"), ZipCreatorUtils
+				.getZipBytes(TestUtils.<String, String>treeMapBuilder().put("deflated", "defl").build()));
+
+		files.putFile(PATH_WORKING_DIRECTORY.resolve("fromstored.zip"), ZipCreatorUtils
+				.getStoredZipBytes(TestUtils.<String, String>treeMapBuilder().put("fromstored", "fstr").build()));
+
 		Map<String, String> contents = new TreeMap<>();
-		contents.put("default1", "def1");
-		contents.put("default2", "def2");
-		contents.put("stored1", "str1");
-		contents.put("stored2", "str2");
-		contents.put("deflated1", "defl1");
-		contents.put("deflated2", "defl2");
-		contents.put("deflevel0", "deflevel0");
-		contents.put("deflevel9", "deflevel9");
-		contents.put("numdeflated", "numdefl");
-		contents.put("emptyconfig", "econf");
+		contents.put("default", "def");
+		contents.put("stored", "str");
+		contents.put("st2/stored", "str");
+		contents.put("deflated", "defl");
+		contents.put("fromstored", "fstr");
+		contents.put("fs2/fromstored", "fstr");
 
 		CombinedTargetTaskResult res;
 
@@ -60,11 +69,10 @@ public class ZipResourcesCompressionTaskTest extends RepositoryLoadingVariablesM
 		ByteArrayRegion zipbytes = files.getAllBytes(zippath);
 		ZipCreatorUtils.assertSameContents(zippath, files, expectedcontents);
 
-		ZipCreatorUtils.assertCompression(zipbytes, ZipEntry.DEFLATED, WildcardPath.valueOf("default*"));
-		ZipCreatorUtils.assertCompression(zipbytes, ZipEntry.STORED, WildcardPath.valueOf("stored*"));
-		ZipCreatorUtils.assertCompression(zipbytes, ZipEntry.DEFLATED, WildcardPath.valueOf("deflated*"));
-		ZipCreatorUtils.assertCompression(zipbytes, ZipEntry.DEFLATED, WildcardPath.valueOf("deflevel*"));
-		ZipCreatorUtils.assertCompression(zipbytes, ZipEntry.DEFLATED, WildcardPath.valueOf("numdeflated"));
-		ZipCreatorUtils.assertCompression(zipbytes, ZipEntry.DEFLATED, WildcardPath.valueOf("emptyconfig"));
+		ZipCreatorUtils.assertCompression(zipbytes, ZipEntry.DEFLATED, WildcardPath.valueOf("default"));
+		ZipCreatorUtils.assertCompression(zipbytes, ZipEntry.STORED, WildcardPath.valueOf("stored"));
+		ZipCreatorUtils.assertCompression(zipbytes, ZipEntry.STORED, WildcardPath.valueOf("st2/stored"));
+		ZipCreatorUtils.assertCompression(zipbytes, ZipEntry.STORED, WildcardPath.valueOf("fromstored"));
+		ZipCreatorUtils.assertCompression(zipbytes, ZipEntry.DEFLATED, WildcardPath.valueOf("fs2/fromstored"));
 	}
 }

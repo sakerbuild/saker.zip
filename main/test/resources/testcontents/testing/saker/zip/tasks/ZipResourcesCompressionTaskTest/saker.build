@@ -27,9 +27,16 @@ build(
 					Level: 9
 				}
 			}
-			{	# only the compression level is given, will use DEFLATED
+			{
+				# only the compression level is given, will use DEFLATED
 				Resources: numdeflated
 				Compression: 5
+			}
+			{
+				Resources: emptyconfig
+				Compression: {
+					# empty
+				}
 			}
 		]
 	)

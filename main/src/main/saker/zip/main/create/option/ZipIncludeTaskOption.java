@@ -71,6 +71,10 @@ public interface ZipIncludeTaskOption {
 		return null;
 	}
 
+	public default ZipCompressionTaskOption getCompression() {
+		return null;
+	}
+
 	public void addTo(TaskContext taskcontext, ZipCreationTaskBuilder taskbuilder);
 
 	public static ZipIncludeTaskOption valueOf(String archivepath) {

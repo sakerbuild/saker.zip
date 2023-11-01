@@ -86,6 +86,11 @@ public class SimpleZipResourcesTaskOption implements ZipResourcesTaskOption {
 	}
 
 	@Override
+	public ZipCompressionTaskOption getCompression() {
+		return compression;
+	}
+
+	@Override
 	public void addTo(TaskContext taskcontext, ZipCreationTaskBuilder taskbuilder) {
 		SakerPath targetdir = ObjectUtils.nullDefault(getTargetDirectory(), SakerPath.EMPTY);
 		if (!targetdir.isForwardRelative()) {

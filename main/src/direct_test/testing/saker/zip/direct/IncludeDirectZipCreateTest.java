@@ -11,6 +11,7 @@ import saker.build.file.path.WildcardPath;
 import saker.build.thirdparty.saker.util.io.ByteArrayRegion;
 import saker.zip.api.create.IncludeResourceMapping;
 import saker.zip.impl.create.ZipOutputSakerFile;
+import saker.zip.impl.create.options.StoredCompressionIncludeResourceMapping;
 import testing.saker.SakerTest;
 import testing.saker.SakerTestCase;
 import testing.saker.build.tests.TestUtils;
@@ -28,11 +29,11 @@ public class IncludeDirectZipCreateTest extends SakerTestCase {
 			//test with compressed included zip contents
 			SakerFile includedzip = ZipCreatorUtils.getZipFile(includedzipcontents);
 
-			ByteArrayRegion bytes = genZipBytes(includedzip, false);
+			ByteArrayRegion bytes = genZipBytes(includedzip, false, false);
 
 			ZipCreatorUtils.assertCompression(bytes, ZipEntry.DEFLATED);
 
-			bytes = genZipBytes(includedzip, true);
+			bytes = genZipBytes(includedzip, true, false);
 
 			ZipCreatorUtils.assertCompression(bytes, ZipEntry.DEFLATED);
 		}
@@ -40,13 +41,29 @@ public class IncludeDirectZipCreateTest extends SakerTestCase {
 			//test with compressed included zip contents
 			SakerFile includedzip = ZipCreatorUtils.getStoredZipFile(includedzipcontents);
 
-			ByteArrayRegion bytes = genZipBytes(includedzip, false);
+			ByteArrayRegion bytes = genZipBytes(includedzip, false, false);
 
 			//the included ZIP has stored entries, they should be copied as stored entries as well
 			ZipCreatorUtils.assertCompression(bytes, ZipEntry.STORED, WildcardPath.valueOf("included/**/*"));
 			ZipCreatorUtils.assertCompression(bytes, ZipEntry.DEFLATED, WildcardPath.valueOf("readme.txt"));
 
-			bytes = genZipBytes(includedzip, true);
+			bytes = genZipBytes(includedzip, true, false);
+
+			//the included ZIP has stored entries, they should be copied as stored entries as well
+			ZipCreatorUtils.assertCompression(bytes, ZipEntry.STORED, WildcardPath.valueOf("included/**/*"));
+			ZipCreatorUtils.assertCompression(bytes, ZipEntry.DEFLATED, WildcardPath.valueOf("readme.txt"));
+		}
+		{
+			//test with compressed included zip contents, but storing them uncompressed using a chained include mapping
+			SakerFile includedzip = ZipCreatorUtils.getZipFile(includedzipcontents);
+
+			ByteArrayRegion bytes = genZipBytes(includedzip, false, true);
+
+			//the included ZIP has stored entries, they should be copied as stored entries as well
+			ZipCreatorUtils.assertCompression(bytes, ZipEntry.STORED, WildcardPath.valueOf("included/**/*"));
+			ZipCreatorUtils.assertCompression(bytes, ZipEntry.DEFLATED, WildcardPath.valueOf("readme.txt"));
+
+			bytes = genZipBytes(includedzip, true, true);
 
 			//the included ZIP has stored entries, they should be copied as stored entries as well
 			ZipCreatorUtils.assertCompression(bytes, ZipEntry.STORED, WildcardPath.valueOf("included/**/*"));
@@ -60,11 +77,15 @@ public class IncludeDirectZipCreateTest extends SakerTestCase {
 	 *            transformer.
 	 */
 	@SuppressWarnings("deprecation")
-	private static ByteArrayRegion genZipBytes(SakerFile includedzip, boolean addtransformer) throws IOException {
+	private static ByteArrayRegion genZipBytes(SakerFile includedzip, boolean addtransformer, boolean storedinclude)
+			throws IOException {
 		ZipOutputSakerFile.Builder builder = ZipOutputSakerFile.builder();
 		builder.add(SakerPath.valueOf("readme.txt"), ZipCreatorUtils.byteFileHandle("readme_base"));
-		builder.addIncludeFromArchive(includedzip, includedzip.getContentDescriptor(),
-				IncludeResourceMapping.targetDirectory(SakerPath.valueOf("included")));
+		IncludeResourceMapping incmapping = IncludeResourceMapping.targetDirectory(SakerPath.valueOf("included"));
+		if (storedinclude) {
+			incmapping = IncludeResourceMapping.chain(incmapping, StoredCompressionIncludeResourceMapping.INSTANCE);
+		}
+		builder.addIncludeFromArchive(includedzip, includedzip.getContentDescriptor(), incmapping);
 		if (addtransformer) {
 			builder.addResourceTransformer(new IdentityZipResourceTransformerFactory());
 		}

@@ -34,11 +34,14 @@ public class SimpleZipIncludeTaskOption implements ZipIncludeTaskOption {
 	private Collection<MultiFileLocationTaskOption> archive;
 	private Collection<WildcardPath> resources;
 	private SakerPath targetDirectory;
+	private ZipCompressionTaskOption compression;
 
 	public SimpleZipIncludeTaskOption(ZipIncludeTaskOption copy) {
 		this.archive = ObjectUtils.cloneArrayList(copy.getArchive(), MultiFileLocationTaskOption::clone);
 		this.resources = ObjectUtils.cloneLinkedHashSet(copy.getResources());
 		this.targetDirectory = copy.getTargetDirectory();
+		ZipCompressionTaskOption compression = copy.getCompression();
+		this.compression = compression == null ? null : compression.clone();
 	}
 
 	@Override
@@ -54,6 +57,11 @@ public class SimpleZipIncludeTaskOption implements ZipIncludeTaskOption {
 	@Override
 	public SakerPath getTargetDirectory() {
 		return targetDirectory;
+	}
+
+	@Override
+	public ZipCompressionTaskOption getCompression() {
+		return compression;
 	}
 
 	@Override
@@ -94,6 +102,12 @@ public class SimpleZipIncludeTaskOption implements ZipIncludeTaskOption {
 		}
 
 		IncludeResourceMapping combinedmappingresult = IncludeResourceMapping.chain(wildcardmapping, targetdirmapping);
+		IncludeResourceMapping compressionmapping = SimpleZipCompressionTaskOption
+				.createIncludeMapping(getCompression());
+		if (compressionmapping != null) {
+			//apply the compression in chain after the previous mappings
+			combinedmappingresult = IncludeResourceMapping.chain(combinedmappingresult, compressionmapping);
+		}
 		for (MultiFileLocationTaskOption archivelocation : archives) {
 			if (archivelocation == null) {
 				continue;
