@@ -34,9 +34,10 @@ import java.util.Map.Entry;
 import java.util.NavigableMap;
 import java.util.NavigableSet;
 import java.util.Objects;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.zip.CRC32;
+import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -58,6 +59,7 @@ import saker.build.thirdparty.saker.util.io.StreamUtils;
 import saker.build.thirdparty.saker.util.io.UnsyncByteArrayInputStream;
 import saker.build.thirdparty.saker.util.io.UnsyncByteArrayOutputStream;
 import saker.zip.api.create.IncludeResourceMapping;
+import saker.zip.api.create.ZipResourceEntry;
 import saker.zip.api.create.ZipResourceTransformationContext;
 import saker.zip.api.create.ZipResourceTransformer;
 import saker.zip.api.create.ZipResourceTransformerFactory;
@@ -66,12 +68,25 @@ public class ZipOutputSakerFile extends SakerFileBase {
 	private static final FileTime DEFAULT_ENTRY_MODIFICATION_TIME = FileTime.fromMillis(0);
 
 	public interface Builder {
-		public void add(SakerPath path, SakerFile file);
+		@Deprecated
+		public default void add(SakerPath path, SakerFile file) {
+			this.add(path, file instanceof SakerDirectory ? null : file, file.getContentDescriptor());
+		}
+
+		public default void add(ZipResourceEntry resourceentry, SakerFile file) {
+			this.add(resourceentry, file instanceof SakerDirectory ? null : file, file.getContentDescriptor());
+		}
 
 		public void setDefaultEntryModificationTime(FileTime defaultEntryModificationTime);
 
 		//null file if directory
-		public void add(SakerPath path, FileHandle file, ContentDescriptor content);
+		@Deprecated
+		public default void add(SakerPath path, FileHandle file, ContentDescriptor content) {
+			this.add(new ZipResourceEntry(path), file, content);
+		}
+
+		//null file if directory
+		public void add(ZipResourceEntry resourceentry, FileHandle file, ContentDescriptor content);
 
 		public void addIncludeFromArchive(FileHandle archivehandle, ContentDescriptor archivecontents,
 				IncludeResourceMapping resourcemappings);
@@ -81,10 +96,20 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		public SakerFile build(String name);
 	}
 
+	private static final class IncludeFile {
+		protected final ZipResourceEntry resourceEntry;
+		protected final FileHandle fileHandle;
+
+		public IncludeFile(ZipResourceEntry resourceEntry, FileHandle fileHandle) {
+			this.resourceEntry = resourceEntry;
+			this.fileHandle = fileHandle;
+		}
+	}
+
 	protected static final class BuilderImpl implements Builder {
-		protected NavigableMap<SakerPath, FileHandle> files = new TreeMap<>();
+		protected NavigableMap<SakerPath, IncludeFile> files = new TreeMap<>();
 		//linked has map for reproducible order
-		protected Map<FileHandle, ZipInclude> includes = new LinkedHashMap<>();
+		protected Map<FileHandle, IncludeResourceMapping> includes = new LinkedHashMap<>();
 
 		protected Collection<ContentDescriptor> subContents = new ArrayList<>();
 
@@ -98,23 +123,21 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		}
 
 		@Override
-		public void add(SakerPath path, SakerFile file) {
-			this.add(path, file instanceof SakerDirectory ? null : file, file.getContentDescriptor());
-		}
-
-		@Override
 		public void setDefaultEntryModificationTime(FileTime defaultEntryModificationTime) {
 			this.defaultEntryModificationTime = defaultEntryModificationTime;
 		}
 
 		@Override
-		public void add(SakerPath path, FileHandle file, ContentDescriptor content) {
-			Objects.requireNonNull(path, "path");
+		public void add(ZipResourceEntry resourceentry, FileHandle file, ContentDescriptor content) {
+			Objects.requireNonNull(resourceentry, "resourceentry");
 			Objects.requireNonNull(content, "content");
+
+			SakerPath path = resourceentry.getEntryPath();
 			if (!path.isForwardRelative()) {
-				throw new InvalidPathFormatException("Zip entry path must be forward relative.");
+				throw new InvalidPathFormatException("Zip entry path must be forward relative: " + path);
 			}
-			FileHandle prevsw = this.files.putIfAbsent(path, file);
+
+			IncludeFile prevsw = this.files.putIfAbsent(path, new IncludeFile(resourceentry, file));
 			if (prevsw != null) {
 				throw new IllegalArgumentException("Duplicate ZIP entries: " + path);
 			}
@@ -128,10 +151,10 @@ public class ZipOutputSakerFile extends SakerFileBase {
 			Objects.requireNonNull(archivehandle, "archive handle");
 			Objects.requireNonNull(resourcemappings, "resource mappings");
 
-			ZipInclude include = new ZipInclude(resourcemappings);
-			ZipInclude previnclude = includes.putIfAbsent(archivehandle, include);
+			IncludeResourceMapping previnclude = includes.putIfAbsent(archivehandle, resourcemappings);
 			if (previnclude != null) {
-				throw new IllegalArgumentException("Multiple includes from archive: " + archivehandle);
+				throw new IllegalArgumentException("Multiple includes from archive: " + archivehandle + " with "
+						+ previnclude + " and " + resourcemappings);
 			}
 			subContents.add(archivecontents);
 		}
@@ -139,7 +162,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		@Override
 		public SakerFile build(String name) {
 			if (files == null) {
-				throw new IllegalStateException();
+				throw new IllegalStateException("Builder already consumed.");
 			}
 			ZipOutputSakerFile result = new ZipOutputSakerFile(name, this);
 			files = null;
@@ -156,14 +179,6 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		}
 	}
 
-	protected static class ZipInclude {
-		protected final IncludeResourceMapping resources;
-
-		public ZipInclude(IncludeResourceMapping resources) {
-			this.resources = resources;
-		}
-	}
-
 	public static Builder builder() {
 		return new BuilderImpl();
 	}
@@ -172,8 +187,8 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		return new BuilderImpl();
 	}
 
-	protected final NavigableMap<SakerPath, FileHandle> files;
-	protected final Map<FileHandle, ZipInclude> includes;
+	protected final Collection<? extends IncludeFile> files;
+	protected final Map<FileHandle, IncludeResourceMapping> includes;
 	protected final ZipFileContentDescriptor contentDescriptor;
 
 	protected ZipOutputSakerFile(String name, BuilderImpl builder)
@@ -182,7 +197,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		ZipFileContentDescriptor contentdescriptor = new ZipFileContentDescriptor(
 				builder.getDefaultEntryModificationTime(), MultiContentDescriptor.create(builder.subContents),
 				builder.transformers);
-		this.files = builder.files;
+		this.files = builder.files.values();
 		this.includes = builder.includes;
 		this.contentDescriptor = contentdescriptor;
 	}
@@ -219,66 +234,187 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		protected final ZipOutputStream zipOut;
 		protected final UnsyncByteArrayOutputStream buffer = new UnsyncByteArrayOutputStream(1024 * 8);
 
+		private int currentLevel = Deflater.DEFAULT_COMPRESSION;
+		private CRC32 crc = null;
+
 		public AbstractTransformationContext(ZipOutputStream zipOut) {
 			this.zipOut = zipOut;
 		}
 
-		public abstract void transform(SakerPath entrypath, FileHandle handle, FileTime modtime) throws IOException;
+		protected CRC32 getCrc() {
+			if (crc == null) {
+				crc = new CRC32();
+			} else {
+				crc.reset();
+			}
+			return crc;
+		}
 
-		public abstract void transform(SakerPath entrypath, UnsyncByteArrayOutputStream contentbuffer, FileTime modtime)
+		protected void updateCompression(ZipEntry entry, int method, int level) {
+			if (method < 0) {
+				//in case of unspecified method, use the defaults
+				method = ZipOutputStream.DEFLATED;
+				level = Deflater.DEFAULT_COMPRESSION;
+			}
+			switch (method) {
+				case ZipOutputStream.DEFLATED: {
+					entry.setMethod(ZipOutputStream.DEFLATED);
+					if (level < 0) {
+						level = Deflater.DEFAULT_COMPRESSION;
+					}
+					if (this.currentLevel != level) {
+						zipOut.setLevel(level);
+						this.currentLevel = level;
+					}
+					break;
+				}
+				case ZipOutputStream.STORED: {
+					//no need to change the output stream itself
+					entry.setMethod(ZipOutputStream.STORED);
+					break;
+				}
+				default: {
+					//unknown method to us,
+					//update the method and level of the stream
+					//pass though the level value even if < 0
+					zipOut.setMethod(method);
+					if (this.currentLevel != level) {
+						zipOut.setLevel(level);
+						this.currentLevel = level;
+					}
+					break;
+				}
+			}
+		}
+
+		public abstract void transform(ZipResourceEntry resourceentry, FileHandle handle) throws IOException;
+
+		public abstract void transform(ZipResourceEntry resourceentry, ZipEntry entry,
+				UnsyncByteArrayOutputStream contentbuffer) throws IOException;
+
+		public abstract void transform(ZipResourceEntry resourceentry, ZipEntry entry, InputStream input)
 				throws IOException;
 
-		public abstract void transform(SakerPath entrypath, InputStream input, FileTime modtime) throws IOException;
+		public abstract void transform(ZipResourceEntry entry, InputStream input) throws IOException;
 
-		public abstract void transformDirectory(SakerPath entrypath, FileTime modtime) throws IOException;
+		public abstract void transformDirectory(ZipResourceEntry entry) throws IOException;
 	}
 
 	private static class NonTransformationContext extends AbstractTransformationContext {
 		private final NavigableMap<SakerPath, Boolean> entries = new TreeMap<>(SakerPath::compareToIgnoreCase);
+		private final FileTime defaultModificationTime;
 
-		public NonTransformationContext(ZipOutputStream zipOut) {
+		public NonTransformationContext(ZipOutputStream zipOut, FileTime defaultmodtime) {
 			super(zipOut);
+			this.defaultModificationTime = defaultmodtime;
 		}
 
 		@Override
-		public void transform(SakerPath entrypath, UnsyncByteArrayOutputStream contentbuffer, FileTime modtime)
+		public void transform(ZipResourceEntry resourceentry, ZipEntry entry, UnsyncByteArrayOutputStream contentbuffer)
 				throws IOException {
+			SakerPath entrypath = resourceentry.getEntryPath();
 			checkEntryFileDuplication(entrypath);
-			ZipEntry ze = new ZipEntry(entrypath.toString());
-			ze.setLastModifiedTime(modtime);
-			zipOut.putNextEntry(ze);
+			putNextEntry(entrypath.toString(), resourceentry, entry);
 			contentbuffer.writeTo(zipOut);
 			zipOut.closeEntry();
 		}
 
 		@Override
-		public void transform(SakerPath entrypath, InputStream input, FileTime modtime) throws IOException {
+		public void transform(ZipResourceEntry resourceentry, InputStream input) throws IOException {
+			SakerPath entrypath = resourceentry.getEntryPath();
 			checkEntryFileDuplication(entrypath);
-			ZipEntry ze = new ZipEntry(entrypath.toString());
-			ze.setLastModifiedTime(modtime);
-			zipOut.putNextEntry(ze);
+			ZipEntry ze = createNextEntry(entrypath.toString(), resourceentry);
+			UnsyncByteArrayOutputStream buffer = this.buffer;
+			if (ze.getMethod() == ZipEntry.STORED) {
+				buffer.reset();
+				buffer.readFrom(input);
+				CRC32 crc = getCrc();
+				int size = buffer.size();
+				crc.update(buffer.getBuffer(), 0, size);
+
+				ze.setCrc(crc.getValue());
+				ze.setSize(size);
+				zipOut.putNextEntry(ze);
+				buffer.writeTo(zipOut);
+			} else {
+				zipOut.putNextEntry(ze);
+				StreamUtils.copyStream(input, zipOut, buffer.getBuffer());
+			}
+			zipOut.closeEntry();
+
+		}
+
+		@Override
+		public void transform(ZipResourceEntry resourceentry, ZipEntry entry, InputStream input) throws IOException {
+			SakerPath entrypath = resourceentry.getEntryPath();
+			checkEntryFileDuplication(entrypath);
+			putNextEntry(entrypath.toString(), resourceentry, entry);
 			StreamUtils.copyStream(input, zipOut, buffer.getBuffer());
 			zipOut.closeEntry();
 		}
 
 		@Override
-		public void transform(SakerPath entrypath, FileHandle handle, FileTime modtime) throws IOException {
+		public void transform(ZipResourceEntry resourceentry, FileHandle handle) throws IOException {
+			SakerPath entrypath = resourceentry.getEntryPath();
 			checkEntryFileDuplication(entrypath);
-			ZipEntry ze = new ZipEntry(entrypath.toString());
-			ze.setLastModifiedTime(modtime);
-			zipOut.putNextEntry(ze);
-			handle.writeTo(zipOut);
+
+			ZipEntry ze = createNextEntry(entrypath.toString(), resourceentry);
+			if (ze.getMethod() == ZipEntry.STORED) {
+				UnsyncByteArrayOutputStream buffer = this.buffer;
+				buffer.reset();
+				handle.writeTo((OutputStream) buffer);
+
+				CRC32 crc = getCrc();
+				int size = buffer.size();
+				crc.update(buffer.getBuffer(), 0, size);
+
+				ze.setCrc(crc.getValue());
+				ze.setSize(size);
+				zipOut.putNextEntry(ze);
+				buffer.writeTo(zipOut);
+			} else {
+				zipOut.putNextEntry(ze);
+				handle.writeTo(zipOut);
+			}
+
 			zipOut.closeEntry();
 		}
 
 		@Override
-		public void transformDirectory(SakerPath entrypath, FileTime modtime) throws IOException {
+		public void transformDirectory(ZipResourceEntry entry) throws IOException {
+			SakerPath entrypath = entry.getEntryPath();
 			if (addCheckEntryDirectoryDuplication(entrypath)) {
-				ZipEntry addentry = new ZipEntry(entrypath + "/");
-				addentry.setLastModifiedTime(modtime);
-				zipOut.putNextEntry(addentry);
+				ZipEntry ze = createNextEntry(entrypath + "/", entry);
+				if (ze.getMethod() == ZipEntry.STORED) {
+					ze.setCrc(0); // zero length data has 0 crc
+					ze.setSize(0);
+				}
+				zipOut.putNextEntry(ze);
+
 				zipOut.closeEntry();
 			}
+
+		}
+
+		private void putNextEntry(String entrypath, ZipResourceEntry resourceentry, ZipEntry entry) throws IOException {
+			ZipEntry ze = createNextEntry(entrypath, resourceentry);
+
+			if (ze.getMethod() == ZipEntry.STORED) {
+				//these need to be set in case of stored
+				ze.setCrc(entry.getCrc());
+				ze.setSize(entry.getSize());
+			}
+
+			zipOut.putNextEntry(ze);
+		}
+
+		private ZipEntry createNextEntry(String entrypath, ZipResourceEntry resourceentry) {
+			ZipEntry ze = new ZipEntry(entrypath);
+			FileTime modtime = resourceentry.getModificationTime();
+
+			ze.setLastModifiedTime(modtime == null ? defaultModificationTime : modtime);
+			updateCompression(ze, resourceentry.getMethod(), resourceentry.getLevel());
+			return ze;
 		}
 
 		private void checkEntryFileDuplication(SakerPath entrypath) {
@@ -295,6 +431,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 			}
 			return prev == null;
 		}
+
 	}
 
 	private static class ResourceBufferingInputStream extends InputStream {
@@ -344,19 +481,17 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		}
 
 		private static class PendingResource {
-			protected final SakerPath path;
+			protected final ZipResourceEntry entry;
 			/**
 			 * The bytes of the entry.
 			 * <p>
 			 * <code>null</code> if represents a directory.
 			 */
 			protected final ByteArrayRegion bytes;
-			protected final FileTime modificationTime;
 
-			public PendingResource(SakerPath path, ByteArrayRegion bytes, FileTime modificationTime) {
-				this.path = path;
+			public PendingResource(ZipResourceEntry entry, ByteArrayRegion bytes) {
+				this.entry = entry;
 				this.bytes = bytes;
-				this.modificationTime = modificationTime;
 			}
 
 		}
@@ -379,15 +514,26 @@ public class ZipOutputSakerFile extends SakerFileBase {
 
 		@Override
 		public void appendDirectory(SakerPath entrypath, FileTime modificationtime) {
-			Objects.requireNonNull(entrypath, "entry path");
-			PendingResource pendingres = new PendingResource(entrypath, null,
-					modificationtime == null ? defaultModificationTime : modificationtime);
+			appendDirectory(new ZipResourceEntry(entrypath, modificationtime));
+		}
+
+		@Override
+		public void appendDirectory(ZipResourceEntry resourceentry) throws NullPointerException {
+			Objects.requireNonNull(resourceentry, "resource entry");
+
+			PendingResource pendingres = new PendingResource(resourceentry, null);
 			pendingResources.add(pendingres);
 		}
 
 		@Override
 		public OutputStream appendFile(SakerPath entrypath, FileTime modificationtime) {
 			Objects.requireNonNull(entrypath, "entry path");
+			return appendFile(new ZipResourceEntry(entrypath, modificationtime));
+		}
+
+		@Override
+		public OutputStream appendFile(ZipResourceEntry resourceentry) throws NullPointerException {
+			Objects.requireNonNull(resourceentry, "resource entry");
 			return new UnsyncByteArrayOutputStream() {
 				private boolean closed = false;
 
@@ -398,8 +544,8 @@ public class ZipOutputSakerFile extends SakerFileBase {
 						return;
 					}
 					closed = true;
-					PendingResource pendingres = new PendingResource(entrypath, toByteArrayRegion(),
-							modificationtime == null ? defaultModificationTime : modificationtime);
+
+					PendingResource pendingres = new PendingResource(resourceentry, toByteArrayRegion());
 					pendingResources.add(pendingres);
 					super.close();
 				}
@@ -407,28 +553,39 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		}
 
 		@Override
-		public void transform(SakerPath entrypath, UnsyncByteArrayOutputStream contentbuffer, FileTime modtime)
-				throws IOException {
-			try (UnsyncByteArrayInputStream is = new UnsyncByteArrayInputStream(contentbuffer.toByteArrayRegion())) {
-				transform(entrypath, is, modtime);
-			}
-		}
-
-		@Override
-		public void transform(SakerPath entrypath, FileHandle handle, FileTime modtime) throws IOException {
+		public void transform(ZipResourceEntry resourceentry, FileHandle handle) throws IOException {
 			try (InputStream is = handle.openInputStream()) {
-				transform(entrypath, is, modtime);
+				transform(resourceentry, is);
 			}
 		}
 
 		@Override
-		public void transformDirectory(SakerPath entrypath, FileTime modtime) throws IOException {
-			transform(entrypath, (InputStream) null, modtime);
+		public void transform(ZipResourceEntry resourceentry, ZipEntry zipentry,
+				UnsyncByteArrayOutputStream contentbuffer) throws IOException {
+			try (UnsyncByteArrayInputStream is = new UnsyncByteArrayInputStream(contentbuffer.toByteArrayRegion())) {
+				transformSingleEntryImpl(resourceentry, is, zipentry);
+
+				executePendingTransformations();
+			}
 		}
 
 		@Override
-		public void transform(SakerPath entrypath, InputStream input, FileTime modtime) throws IOException {
-			transformSingleEntryImpl(entrypath, input, modtime);
+		public void transform(ZipResourceEntry resourceentry, ZipEntry zipentry, InputStream input) throws IOException {
+			transformSingleEntryImpl(resourceentry, input, zipentry);
+
+			executePendingTransformations();
+		}
+
+		@Override
+		public void transformDirectory(ZipResourceEntry entry) throws IOException {
+			transformSingleEntryImpl(entry, null, null);
+
+			executePendingTransformations();
+		}
+
+		@Override
+		public void transform(ZipResourceEntry entry, InputStream input) throws IOException {
+			transformSingleEntryImpl(entry, input, null);
 
 			executePendingTransformations();
 		}
@@ -454,15 +611,15 @@ public class ZipOutputSakerFile extends SakerFileBase {
 				if (pendingres == null) {
 					break;
 				}
-				transformSingleEntryImpl(pendingres.path,
-						pendingres.bytes == null ? null : new UnsyncByteArrayInputStream(pendingres.bytes),
-						pendingres.modificationTime);
+				transformSingleEntryImpl(pendingres.entry,
+						pendingres.bytes == null ? null : new UnsyncByteArrayInputStream(pendingres.bytes), null);
 			}
 		}
 
-		private boolean callTransformationsSingleEntryImpl(SakerPath entrypath, InputStream input) throws IOException {
+		private ZipResourceEntry callTransformationsSingleEntryImpl(ZipResourceEntry entry, InputStream input)
+				throws IOException {
 			if (transformers.isEmpty()) {
-				return false;
+				return entry;
 			}
 			transformingBuffer.reset();
 			ResourceBufferingInputStream bufferingin = input == null ? null
@@ -475,25 +632,60 @@ public class ZipOutputSakerFile extends SakerFileBase {
 					transformerin = new ConcatInputStream(
 							new UnsyncByteArrayInputStream(transformingBuffer.toByteArrayRegion()), bufferingin);
 				}
-				boolean consumed = transformer.transformer.process(this, entrypath, transformerin);
-				if (consumed) {
-					return true;
+				ZipResourceEntry replacemententry = transformer.transformer.process(this, entry, transformerin);
+				if (replacemententry == null) {
+					//consumed
+					return null;
 				}
+				entry = replacemententry;
 			}
-			return false;
+			return entry;
 		}
 
-		private void transformSingleEntryImpl(SakerPath entrypath, InputStream input, FileTime modtime)
+		/**
+		 * @param input
+		 *            <code>null</code> for directories.
+		 * @param zipentry
+		 *            may be <code>null</code> if not from a zip.
+		 */
+		private void transformSingleEntryImpl(ZipResourceEntry entry, InputStream input, ZipEntry zipentry)
 				throws IOException {
-			if (callTransformationsSingleEntryImpl(entrypath, input)) {
+			ZipResourceEntry replacemententry = callTransformationsSingleEntryImpl(entry, input);
+			if (replacemententry == null) {
 				//the entry was consumed
 				return;
 			}
+			entry = replacemententry;
+
+			//the input was not consumed
+
+			SakerPath entrypath = entry.getEntryPath();
+			FileTime modtime = entry.getModificationTime();
 
 			checkEntryDuplication(entrypath);
-			//the input was not consumed
 			ZipEntry ze = new ZipEntry(input == null ? entrypath.toString() + "/" : entrypath.toString());
 			ze.setLastModifiedTime(modtime == null ? defaultModificationTime : modtime);
+			int method = entry.getMethod();
+			updateCompression(ze, method, entry.getLevel());
+			if (method == ZipEntry.STORED) {
+				//these need to be set in case of stored
+				if (zipentry != null) {
+					ze.setCrc(zipentry.getCrc());
+					ze.setSize(zipentry.getSize());
+				} else if (input == null) {
+					ze.setCrc(0);
+					ze.setSize(0);
+				} else {
+					//we need to read the data and calculate the length and crc
+					CRC32 crc = getCrc();
+					transformingBuffer.readFrom(input);
+					int size = transformingBuffer.size();
+					crc.update(transformingBuffer.getBuffer(), 0, size);
+					ze.setCrc(crc.getValue());
+					ze.setSize(size);
+				}
+			}
+
 			zipOut.putNextEntry(ze);
 			if (input != null) {
 				transformingBuffer.writeTo(zipOut);
@@ -518,30 +710,34 @@ public class ZipOutputSakerFile extends SakerFileBase {
 			}
 			transformers.add(transformer);
 		}
-		FileTime defaultmodificationtime = getDefaultModificationTime();
 		try (TransformationContextImpl context = new TransformationContextImpl(zipos, transformers,
-				defaultmodificationtime)) {
-			writeZipFiles(defaultmodificationtime, context);
+				getDefaultModificationTime())) {
+			writeZipFiles(context);
 			writeZipIncludes(context);
 		}
 	}
 
 	private void writeNonTransformingZip(ZipOutputStream zipos) throws IOException {
-		NonTransformationContext context = new NonTransformationContext(zipos);
-		writeZipFiles(getDefaultModificationTime(), context);
+		NonTransformationContext context = new NonTransformationContext(zipos, getDefaultModificationTime());
+		writeZipFiles(context);
 		writeZipIncludes(context);
 	}
 
-	private void writeZipFiles(FileTime defaultmodtime, AbstractTransformationContext context) throws IOException {
+	private void writeZipFiles(AbstractTransformationContext context) throws IOException {
 		if (files.isEmpty()) {
 			return;
 		}
-		for (Entry<SakerPath, ? extends FileHandle> entry : files.entrySet()) {
-			FileHandle handle = entry.getValue();
+		FileTime defaultmodtime = getDefaultModificationTime();
+		for (IncludeFile includefile : files) {
+			FileHandle handle = includefile.fileHandle;
+			ZipResourceEntry resourceentry = includefile.resourceEntry;
+			if (resourceentry.getModificationTime() == null) {
+				resourceentry = resourceentry.withModificationTime(defaultmodtime);
+			}
 			if (handle == null) {
-				context.transformDirectory(entry.getKey(), defaultmodtime);
+				context.transformDirectory(resourceentry);
 			} else {
-				context.transform(entry.getKey(), handle, defaultmodtime);
+				context.transform(resourceentry, handle);
 			}
 		}
 	}
@@ -550,63 +746,66 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		if (includes.isEmpty()) {
 			return;
 		}
-		NavigableSet<SakerPath> multientryaddpaths = new TreeSet<>();
-		for (Entry<FileHandle, ZipInclude> incentry : includes.entrySet()) {
+		NavigableMap<SakerPath, ZipResourceEntry> multientryaddpaths = new TreeMap<>();
+		for (Entry<FileHandle, IncludeResourceMapping> incentry : includes.entrySet()) {
 			FileHandle handle = incentry.getKey();
-			ZipInclude inc = incentry.getValue();
+			IncludeResourceMapping inc = incentry.getValue();
 			try (InputStream archivein = handle.openInputStream();
 					ZipInputStream zis = new ZipInputStream(archivein)) {
 				for (ZipEntry ze; (ze = zis.getNextEntry()) != null;) {
 					String name = ze.getName();
 					boolean directory = ze.isDirectory();
-					FileTime lastmodifiedtime = ze.getLastModifiedTime();
 
-					multientryaddpaths.clear();
 					SakerPath path = SakerPath.valueOf(name);
 
-					IncludeResourceMapping mapping = inc.resources;
-					Set<SakerPath> addentrypaths = mapping.mapResourcePath(path, directory);
+					ZipResourceEntry zipresourceentry = new ZipResourceEntry(path, ze.getLastModifiedTime(),
+							ze.getMethod(), -1);
+
+					Collection<? extends ZipResourceEntry> addentrypaths = inc.mapResource(zipresourceentry, directory);
 					if (ObjectUtils.isNullOrEmpty(addentrypaths)) {
 						//don't include
 						continue;
 					}
-					if (directory) {
-						for (SakerPath addentrypath : addentrypaths) {
-							validateMappingResultPath(path, mapping, addentrypath);
 
-							context.transformDirectory(addentrypath, lastmodifiedtime);
+					if (directory) {
+						for (ZipResourceEntry addentry : addentrypaths) {
+							validateMappingResultPath(path, inc, addentry.getEntryPath());
+
+							context.transformDirectory(addentry);
 						}
 					} else {
-						for (SakerPath addentrypath : addentrypaths) {
-							validateMappingResultPath(path, mapping, addentrypath);
+						for (ZipResourceEntry addentry : addentrypaths) {
+							SakerPath entrypath = addentry.getEntryPath();
+							validateMappingResultPath(path, inc, entrypath);
 
-							multientryaddpaths.add(addentrypath);
+							ZipResourceEntry prev = multientryaddpaths.putIfAbsent(entrypath, addentry);
+							if (prev != null) {
+								//multiple entries found for the same name
+								//XXX maybe handle this somehow? currently taking one is okay, doesn't seem very relevant at the moment
+							}
 						}
-					}
 
-					if (!multientryaddpaths.isEmpty()) {
-						if (multientryaddpaths.size() > 1) {
-							if (directory) {
-								for (SakerPath addentrypath : multientryaddpaths) {
-									context.transformDirectory(addentrypath, lastmodifiedtime);
-								}
-							} else {
+						Entry<SakerPath, ZipResourceEntry> addentrypath = multientryaddpaths.pollFirstEntry();
+						if (addentrypath != null) {
+							if (!multientryaddpaths.isEmpty()) {
+								//buffer the resource data and transform for each additional entry path
 								UnsyncByteArrayOutputStream bytebuffer = context.buffer;
 								bytebuffer.reset();
 								bytebuffer.readFrom(zis);
-								for (SakerPath addentrypath : multientryaddpaths) {
-									context.transform(addentrypath, bytebuffer, lastmodifiedtime);
+
+								while (true) {
+									context.transform(addentrypath.getValue(), ze, bytebuffer);
+									addentrypath = multientryaddpaths.pollFirstEntry();
+									if (addentrypath == null) {
+										break;
+									}
 								}
-							}
-						} else {
-							SakerPath addentrypath = multientryaddpaths.pollFirst();
-							if (directory) {
-								context.transformDirectory(addentrypath, lastmodifiedtime);
 							} else {
-								context.transform(addentrypath, zis, lastmodifiedtime);
+								context.transform(addentrypath.getValue(), ze, zis);
 							}
 						}
 					}
+
 				}
 			}
 		}

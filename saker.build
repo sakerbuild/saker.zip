@@ -36,7 +36,7 @@ compile(
 	)
 }
 export(
-	out compile = include(compile),
+	out compile = compile(),
 	out mainjar,
 	out apijar,
 	out impljar,
@@ -138,7 +138,7 @@ export(
 	)
 }
 install(
-	out export = include(export)
+	out export = export()
 ){
 	nest.local.install($export[bundlepaths])
 }
@@ -152,33 +152,52 @@ upload(){
 		Overwrite: true,
 	)
 }
-test(){
-	$export = include(export)
-	$mainjar = $export[mainjar][Path]
-	
+compile_testutils(
+	out instrumentedjar
+	out testutilscompile
+) {
 	$instrumentedjar = nest.test.instrument(
 		nest.bundle.download("saker.build-test-v{ static(VERSION_saker.build) }")[BundlePaths][0],
 		NestVersion: static(VERSION_saker.nest),
 	)
 	
-	$testcompile = saker.java.compile(
-		SourceDirectories: main/src/test/,
+	$testutilscompile = saker.java.compile(
+		SourceDirectories: main/src/test_utils/,
 		ClassPath: [
 			$instrumentedjar,
 			saker.java.classpath.bundle([
 				"saker.build-test-runner-v{ static(VERSION_saker.build) }",
 				"saker.build-test-utils-v{ static(VERSION_saker.build) }",
+			]),
+		]
+		Identifier: saker.zip.test_utils,
+	)
+}
+test(){
+	$export = export()
+	$mainjar = $export[mainjar][Path]
+	
+	$compile_testutils = compile_testutils()
+	$instrumentedjar = $compile_testutils[instrumentedjar]
+	$testutilscompile = $compile_testutils[testutilscompile]
+	
+	$testcompile = saker.java.compile(
+		SourceDirectories: main/src/test/,
+		ClassPath: [
+			saker.java.classpath.bundle([
 				"saker.nest-test-utils-v{ static(VERSION_saker.nest )}"
 			]),
+			$testutilscompile
 		],
 		Identifier: saker.zip.tests,
 	)
+	
 	$resolveddependencies = nest.dependency.resolve(
 		Bundles: global(saker.zip_DEPENDENCIES),
 		Filters: nest.dependency.filter.kind(classpath)
 	)
 	
-	$test = saker.java.test(
+	saker.java.test(
 		TestRunnerClassPath: [
 			saker.java.classpath.bundle("saker.build-test-runner-v{ static(VERSION_saker.build) }"),
 		],
@@ -190,6 +209,7 @@ test(){
 		],
 		TestInvokerClass: testing.saker.SakerJavaTestingInvoker,
 		TestClassPath:	[
+			$testutilscompile[ClassDirectory],
 			$testcompile[ClassDirectory],
 			saker.java.classpath.bundle([
 				"saker.build-test-utils-v{ static(VERSION_saker.build) }",
@@ -197,7 +217,7 @@ test(){
 			]),
 		],
 		TestClasses: [
-			testing.saker.tests.**.*Test
+			testing.saker.zip.tasks.**.*Test
 		],
 		NonDeterministicTests: [
 			**,
@@ -221,10 +241,85 @@ test(){
 		IgnoreFileChanges: [
 			std.file.place(test/build),
 		],
-		#ProcessJVMParameters: [ "-agentlib:jdwp=transport=dt_socket,address=localhost:5432,server=y,suspend=y,quiet=y" ],
+		ProcessJVMParameters: [ 
+			#"-agentlib:jdwp=transport=dt_socket,address=localhost:5432,server=y,suspend=y,quiet=y"
+			"-Xverify:all" # due to a crash that we encountered: fatal error: Illegal class file encountered. Try running with -Xverify:all in method createDirectories
+		],
 		MaxJVMCount: 1,
 		FailFast: true,
 		AbortOnFail: true,
 		Verbose: true,
 	)
+}
+test_direct() {
+	$export = export()
+	$mainjar = $export[mainjar][Path]
+	
+	$compile_testutils = compile_testutils()
+	$instrumentedjar = $compile_testutils[instrumentedjar]
+	$testutilscompile = $compile_testutils[testutilscompile]
+	
+	$directtestcompile = saker.java.compile(
+		SourceDirectories: main/src/direct_test/,
+		ClassPath: [
+			$testutilscompile
+			$export[compile][javac]
+		],
+		Identifier: saker.zip.direct_tests,
+	)
+	
+	$resolveddependencies = nest.dependency.resolve(
+		Bundles: global(saker.zip_DEPENDENCIES),
+		Filters: nest.dependency.filter.kind(classpath)
+	)
+	
+	saker.java.test(
+		TestRunnerClassPath: [
+			saker.java.classpath.bundle("saker.build-test-runner-v{ static(VERSION_saker.build) }"),
+		],
+		ClassPath: [
+			$export[compile][javac][ClassDirectory],
+			saker.java.classpath.bundle([
+				"saker.build-test-v{ static(VERSION_saker.build) }",
+			] + foreach $bundle in $resolveddependencies[Bundles] : [$bundle[BundleIdentifier]]),
+		],
+		DependencyClassPath: [
+			$export[compile][javac],
+		],
+		TestInvokerClass: testing.saker.SakerJavaTestingInvoker,
+		TestClassPath:	[
+			$testutilscompile[ClassDirectory],
+			$directtestcompile[ClassDirectory],
+			saker.java.classpath.bundle([
+				"saker.build-test-utils-v{ static(VERSION_saker.build) }",
+			]),
+		],
+		TestClasses: [
+			testing.saker.zip.direct.**.*Test
+		],
+		NonDeterministicTests: [
+			**,
+		],
+		TestInvokerParameters: {
+			TimeoutMillis: 120000,
+		},
+		WorkingDirectory: main,
+		IgnoreFileChanges: [
+			std.file.place(test/build),
+		],
+		ProcessJVMParameters: [ 
+			#"-agentlib:jdwp=transport=dt_socket,address=localhost:5432,server=y,suspend=y,quiet=y"
+			"-Xverify:all" # due to a crash that we encountered: fatal error: Illegal class file encountered. Try running with -Xverify:all in method createDirectories
+		],
+		MaxJVMCount: 1,
+		FailFast: true,
+		AbortOnFail: true,
+		Verbose: true,
+	)
+
+}
+
+testboth {
+	test()
+	test_direct()
 }

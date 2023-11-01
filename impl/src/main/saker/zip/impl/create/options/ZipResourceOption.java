@@ -22,6 +22,7 @@ import java.io.ObjectOutput;
 
 import saker.build.file.path.SakerPath;
 import saker.std.api.file.location.FileLocation;
+import saker.zip.api.create.ZipResourceEntry;
 
 public class ZipResourceOption implements Externalizable {
 	private static final long serialVersionUID = 1L;
@@ -46,6 +47,10 @@ public class ZipResourceOption implements Externalizable {
 
 	public SakerPath getArchivePath() {
 		return archivePath;
+	}
+	
+	public ZipResourceEntry getArchiveResourceEntry() {
+		return new ZipResourceEntry(archivePath);
 	}
 
 	@Override

@@ -16,6 +16,7 @@
 package saker.zip.api.create;
 
 import java.io.Externalizable;
+import java.util.Collection;
 import java.util.Set;
 
 import saker.build.exception.InvalidPathFormatException;
@@ -57,13 +58,19 @@ public interface IncludeResourceMapping {
 	 * If the result contains one or more paths, then the entry will be written to every archive paths in the result
 	 * set. This can also be used to include an entry multiple times with the same contents.
 	 * 
+	 * @deprecated Deprecated since saker.zip 0.8.5. Use {@link #mapResource(ZipResourceEntry, boolean)} instead, which
+	 *                 allows manipulation additonal properties of the resources. This function is no longer used by the
+	 *                 ZIP creator implementation after (and including) version 0.8.5.
 	 * @param archivepath
 	 *            The archive path of the entry being included.
 	 * @param directory
 	 *            <code>true</code> if the entry is a directory.
 	 * @return The path(s) for which the entry should be written in the created archive.
 	 */
+	@Deprecated
 	public Set<SakerPath> mapResourcePath(SakerPath archivepath, boolean directory);
+
+	public Collection<? extends ZipResourceEntry> mapResource(ZipResourceEntry resourceentry, boolean directory);
 
 	@Override
 	public int hashCode();
@@ -142,7 +149,7 @@ public interface IncludeResourceMapping {
 	/**
 	 * Gets a resource mapping that aggregates multiple mappings.
 	 * <p>
-	 * The returned mapping will call all argument mappings, and concatenate the result paths.
+	 * The returned mapping will call all argument mappings, and merge the result paths.
 	 * <p>
 	 * If the argument is <code>null</code> or empty, the result will exclude all entries.
 	 * 

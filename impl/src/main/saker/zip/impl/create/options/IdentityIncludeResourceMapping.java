@@ -19,12 +19,14 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.Collection;
 import java.util.Set;
 
 import saker.build.file.path.SakerPath;
 import saker.build.thirdparty.saker.util.ImmutableUtils;
 import saker.build.thirdparty.saker.util.ObjectUtils;
 import saker.zip.api.create.IncludeResourceMapping;
+import saker.zip.api.create.ZipResourceEntry;
 
 public final class IdentityIncludeResourceMapping implements IncludeResourceMapping, Externalizable {
 	private static final long serialVersionUID = 1L;
@@ -38,8 +40,14 @@ public final class IdentityIncludeResourceMapping implements IncludeResourceMapp
 	}
 
 	@Override
+	@SuppressWarnings("deprecation")
 	public Set<SakerPath> mapResourcePath(SakerPath archivepath, boolean directory) {
 		return ImmutableUtils.singletonSet(archivepath);
+	}
+
+	@Override
+	public Collection<? extends ZipResourceEntry> mapResource(ZipResourceEntry resourceentry, boolean directory) {
+		return ImmutableUtils.singletonSet(resourceentry);
 	}
 
 	@Override

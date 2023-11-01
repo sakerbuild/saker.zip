@@ -158,7 +158,7 @@ public class ZipCreateWorkerTaskFactory
 					}
 
 					private void handle(ContentDescriptor contents, FileHandle fhandle) {
-						builder.add(resoption.getArchivePath(), fhandle, contents);
+						builder.add(resoption.getArchiveResourceEntry(), fhandle, contents);
 					}
 				});
 			}

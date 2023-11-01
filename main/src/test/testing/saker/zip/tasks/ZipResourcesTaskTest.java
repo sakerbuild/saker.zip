@@ -13,7 +13,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package testing.saker.tests.tasks.zip.create;
+package testing.saker.zip.tasks;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -23,6 +23,7 @@ import java.util.TreeMap;
 import saker.build.file.path.SakerPath;
 import testing.saker.SakerTest;
 import testing.saker.nest.util.RepositoryLoadingVariablesMetricEnvironmentTestCase;
+import testing.saker.zip.test.utils.ZipCreatorUtils;
 
 @SakerTest
 public class ZipResourcesTaskTest extends RepositoryLoadingVariablesMetricEnvironmentTestCase {

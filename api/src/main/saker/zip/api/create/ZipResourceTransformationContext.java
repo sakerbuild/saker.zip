@@ -43,6 +43,8 @@ public interface ZipResourceTransformationContext {
 	 */
 	public void appendDirectory(SakerPath entrypath, FileTime modificationtime) throws NullPointerException;
 
+	public void appendDirectory(ZipResourceEntry resourceentry) throws NullPointerException;
+
 	/**
 	 * Adds a file entry to the created ZIP archive.
 	 * <p>
@@ -64,4 +66,6 @@ public interface ZipResourceTransformationContext {
 	 *             If the entry path is <code>null</code>.
 	 */
 	public OutputStream appendFile(SakerPath entrypath, FileTime modificationtime) throws NullPointerException;
+
+	public OutputStream appendFile(ZipResourceEntry resourceentry)throws NullPointerException;
 }

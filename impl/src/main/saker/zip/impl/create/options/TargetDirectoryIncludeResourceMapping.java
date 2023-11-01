@@ -19,6 +19,7 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.Collection;
 import java.util.Objects;
 import java.util.Set;
 
@@ -26,6 +27,7 @@ import saker.build.exception.InvalidPathFormatException;
 import saker.build.file.path.SakerPath;
 import saker.build.thirdparty.saker.util.ImmutableUtils;
 import saker.zip.api.create.IncludeResourceMapping;
+import saker.zip.api.create.ZipResourceEntry;
 
 public final class TargetDirectoryIncludeResourceMapping implements IncludeResourceMapping, Externalizable {
 	private static final long serialVersionUID = 1L;
@@ -48,8 +50,15 @@ public final class TargetDirectoryIncludeResourceMapping implements IncludeResou
 	}
 
 	@Override
+	@SuppressWarnings("deprecation")
 	public Set<SakerPath> mapResourcePath(SakerPath archivepath, boolean directory) {
 		return ImmutableUtils.singletonSet(targetDirectory.resolve(archivepath));
+	}
+
+	@Override
+	public Collection<? extends ZipResourceEntry> mapResource(ZipResourceEntry resourceentry, boolean directory) {
+		return ImmutableUtils
+				.singletonSet(resourceentry.withEntryPath(targetDirectory.resolve(resourceentry.getEntryPath())));
 	}
 
 	@Override

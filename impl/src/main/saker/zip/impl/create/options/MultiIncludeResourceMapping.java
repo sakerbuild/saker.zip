@@ -19,6 +19,7 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -28,6 +29,7 @@ import saker.build.thirdparty.saker.util.ImmutableUtils;
 import saker.build.thirdparty.saker.util.ObjectUtils;
 import saker.build.thirdparty.saker.util.io.SerialUtils;
 import saker.zip.api.create.IncludeResourceMapping;
+import saker.zip.api.create.ZipResourceEntry;
 
 public final class MultiIncludeResourceMapping implements IncludeResourceMapping, Externalizable {
 	private static final long serialVersionUID = 1L;
@@ -64,10 +66,23 @@ public final class MultiIncludeResourceMapping implements IncludeResourceMapping
 	}
 
 	@Override
+	@SuppressWarnings("deprecation")
 	public Set<SakerPath> mapResourcePath(SakerPath archivepath, boolean directory) {
 		LinkedHashSet<SakerPath> result = new LinkedHashSet<>();
 		for (IncludeResourceMapping mapping : mappings) {
 			Set<SakerPath> mapres = mapping.mapResourcePath(archivepath, directory);
+			if (mapres != null) {
+				result.addAll(mapres);
+			}
+		}
+		return result;
+	}
+
+	@Override
+	public Collection<? extends ZipResourceEntry> mapResource(ZipResourceEntry resourceentry, boolean directory) {
+		LinkedHashSet<ZipResourceEntry> result = new LinkedHashSet<>();
+		for (IncludeResourceMapping mapping : mappings) {
+			Collection<? extends ZipResourceEntry> mapres = mapping.mapResource(resourceentry, directory);
 			if (mapres != null) {
 				result.addAll(mapres);
 			}

@@ -63,6 +63,10 @@ public interface ZipResourceTransformer {
 	 * Implementations should take care to implement guarding when they process and generate a resource with the same
 	 * name. Not employing guarding may result in infinite looping by the transformation context.
 	 * 
+	 * @deprecated Deprecated since saker.zip 0.8.5. Use
+	 *                 {@link #process(ZipResourceTransformationContext, ZipResourceEntry, InputStream)} instead, which
+	 *                 gives access to additional properties of the transformed resource. This function is no longer
+	 *                 used by the ZIP creator implementation after (and including) version 0.8.5.
 	 * @param context
 	 *            The transformation context.
 	 * @param resourcepath
@@ -74,8 +78,14 @@ public interface ZipResourceTransformer {
 	 * @throws IOException
 	 *             Transformers may throw in case of errors.
 	 */
+	@Deprecated
 	public boolean process(ZipResourceTransformationContext context, SakerPath resourcepath, InputStream resourceinput)
 			throws IOException;
+
+	public default ZipResourceEntry process(ZipResourceTransformationContext context, ZipResourceEntry resourceentry,
+			InputStream resourceinput) throws IOException {
+		return process(context, resourceentry.getEntryPath(), resourceinput) ? null : resourceentry;
+	}
 
 	/**
 	 * Asks the processor to write any pending resources to the ZIP archive.

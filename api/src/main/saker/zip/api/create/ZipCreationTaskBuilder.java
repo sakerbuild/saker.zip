@@ -38,7 +38,7 @@ public interface ZipCreationTaskBuilder {
 	 * <p>
 	 * The specified path must be {@linkplain SakerPath#isAbsolute() absolute}.
 	 * <p>
-	 * Setting the output path is <b>requierd</b> before calling the build methods.
+	 * Setting the output path is <b>required</b> before calling the build methods.
 	 * 
 	 * @param outputPath
 	 *            The output path.

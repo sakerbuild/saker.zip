@@ -13,21 +13,24 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package testing.saker.tests.tasks.zip.create;
+package testing.saker.zip.tasks;
 
-import saker.build.file.path.SakerPath;
 import testing.saker.SakerTest;
+import testing.saker.build.tests.TestUtils;
 import testing.saker.nest.util.RepositoryLoadingVariablesMetricEnvironmentTestCase;
+import testing.saker.zip.test.utils.ZipCreatorUtils;
 
 @SakerTest
-public class ZipIncrementalityBugTest extends RepositoryLoadingVariablesMetricEnvironmentTestCase {
-
+public class ZipIncludeConflictTaskTest extends RepositoryLoadingVariablesMetricEnvironmentTestCase {
 	@Override
 	protected void runTestImpl() throws Throwable {
-		runScriptTask("export", SakerPath.valueOf("subdir/saker.build"));
-		
-		runScriptTask("export", SakerPath.valueOf("subdir/saker.build"));
-		assertEmpty(getMetric().getRunTaskIdFactories());
+		//there should be a case-insensitive conflict
+		files.putFile(PATH_WORKING_DIRECTORY.resolve("first.zip"), ZipCreatorUtils
+				.getZipBytes(TestUtils.<String, String>treeMapBuilder().put("inc.txt", "incval1").build()));
+		files.putFile(PATH_WORKING_DIRECTORY.resolve("second.zip"), ZipCreatorUtils
+				.getZipBytes(TestUtils.<String, String>treeMapBuilder().put("INC.TXT", "incval2").build()));
+
+		assertTaskException(IllegalArgumentException.class, () -> runScriptTask("build"));
 	}
 
 }

@@ -19,6 +19,7 @@ import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -26,6 +27,7 @@ import java.util.Set;
 import saker.build.file.path.SakerPath;
 import saker.build.thirdparty.saker.util.ObjectUtils;
 import saker.zip.api.create.IncludeResourceMapping;
+import saker.zip.api.create.ZipResourceEntry;
 
 public final class ChainIncludeResourceMapping implements IncludeResourceMapping, Externalizable {
 	private static final long serialVersionUID = 1L;
@@ -45,6 +47,7 @@ public final class ChainIncludeResourceMapping implements IncludeResourceMapping
 	}
 
 	@Override
+	@SuppressWarnings("deprecation")
 	public Set<SakerPath> mapResourcePath(SakerPath archivepath, boolean directory) {
 		Set<SakerPath> firstres = first.mapResourcePath(archivepath, directory);
 		int size;
@@ -57,6 +60,26 @@ public final class ChainIncludeResourceMapping implements IncludeResourceMapping
 		Set<SakerPath> result = new LinkedHashSet<>();
 		for (SakerPath path : firstres) {
 			Set<SakerPath> secondres = second.mapResourcePath(path, directory);
+			if (!ObjectUtils.isNullOrEmpty(secondres)) {
+				result.addAll(secondres);
+			}
+		}
+		return result;
+	}
+
+	@Override
+	public Collection<? extends ZipResourceEntry> mapResource(ZipResourceEntry resourceentry, boolean directory) {
+		Collection<? extends ZipResourceEntry> firstres = first.mapResource(resourceentry, directory);
+		int size;
+		if (firstres == null || (size = firstres.size()) == 0) {
+			return Collections.emptySet();
+		}
+		if (size == 1) {
+			return second.mapResource(firstres.iterator().next(), directory);
+		}
+		Set<ZipResourceEntry> result = new LinkedHashSet<>();
+		for (ZipResourceEntry firstresentry : firstres) {
+			Collection<? extends ZipResourceEntry> secondres = second.mapResource(firstresentry, directory);
 			if (!ObjectUtils.isNullOrEmpty(secondres)) {
 				result.addAll(secondres);
 			}
