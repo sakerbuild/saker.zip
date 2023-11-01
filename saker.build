@@ -33,6 +33,9 @@ compile(
 			)),
 		],
 		Identifier: saker.zip,
+		Parameters: [--release, 8,]
+		SourceVersion: RELEASE_8,
+		TargetVersion: RELEASE_8,
 	)
 }
 export(
