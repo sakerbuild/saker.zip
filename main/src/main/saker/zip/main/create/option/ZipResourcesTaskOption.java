@@ -86,6 +86,10 @@ public interface ZipResourcesTaskOption {
 		return null;
 	}
 
+	public default ZipCompressionTaskOption getCompression() {
+		return null;
+	}
+
 	public void addTo(TaskContext taskcontext, ZipCreationTaskBuilder taskbuilder);
 
 	public static ZipResourcesTaskOption valueOf(FileCollection filecollection) {

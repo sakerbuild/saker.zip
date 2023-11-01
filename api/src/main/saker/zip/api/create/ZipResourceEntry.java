@@ -1,5 +1,9 @@
 package saker.zip.api.create;
 
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
 import java.nio.file.attribute.FileTime;
 import java.util.Objects;
 import java.util.zip.ZipEntry;
@@ -7,15 +11,29 @@ import java.util.zip.ZipOutputStream;
 
 import saker.build.file.path.SakerPath;
 
-public final class ZipResourceEntry {
+public final class ZipResourceEntry implements Externalizable {
+	private static final long serialVersionUID = 1L;
+	
 	protected SakerPath entryPath;
 	protected FileTime modificationTime;
 
 	protected int method;
 	protected int level;
 
+	/**
+	 * For {@link Externalizable}.
+	 */
+	@Deprecated
+	public ZipResourceEntry() {
+	}
+
 	private ZipResourceEntry(SakerPath entryPath, FileTime modificationTime, int method, int level) {
 		Objects.requireNonNull(entryPath, "entryPath");
+		if (level < -1) {
+			//normalize negative level to -1
+			level = -1;
+		}
+
 		this.entryPath = entryPath;
 		this.modificationTime = modificationTime;
 		this.method = method;
@@ -93,6 +111,22 @@ public final class ZipResourceEntry {
 
 	public ZipResourceEntry withModificationTime(FileTime modificationTime) {
 		return new ZipResourceEntry(entryPath, modificationTime, method, level);
+	}
+
+	@Override
+	public void writeExternal(ObjectOutput out) throws IOException {
+		out.writeObject(entryPath);
+		out.writeObject(modificationTime);
+		out.writeInt(method);
+		out.writeInt(level);
+	}
+
+	@Override
+	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
+		entryPath = (SakerPath) in.readObject();
+		modificationTime = (FileTime) in.readObject();
+		method = in.readInt();
+		level = in.readInt();
 	}
 
 	@Override

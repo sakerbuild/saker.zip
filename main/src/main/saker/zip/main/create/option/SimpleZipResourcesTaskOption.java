@@ -49,12 +49,15 @@ public class SimpleZipResourcesTaskOption implements ZipResourcesTaskOption {
 	private Collection<WildcardPath> resources;
 	private Collection<MultiFileLocationTaskOption> files;
 	private SakerPath targetDirectory;
+	private ZipCompressionTaskOption compression;
 
 	public SimpleZipResourcesTaskOption(ZipResourcesTaskOption copy) {
 		this.directory = ObjectUtils.cloneArrayList(copy.getDirectory(), MultiFileLocationTaskOption::clone);
 		this.resources = ObjectUtils.cloneArrayList(copy.getResources());
 		this.files = ObjectUtils.cloneArrayList(copy.getFiles(), MultiFileLocationTaskOption::clone);
 		this.targetDirectory = copy.getTargetDirectory();
+		ZipCompressionTaskOption compression = copy.getCompression();
+		this.compression = compression == null ? null : compression.clone();
 	}
 
 	@Override
@@ -102,7 +105,8 @@ public class SimpleZipResourcesTaskOption implements ZipResourcesTaskOption {
 				}
 				for (FileLocation flocation : TaskOptionUtils.toFileLocations(flocopt, taskcontext,
 						TaskTags.TASK_INPUT_FILE)) {
-					taskbuilder.addResource(flocation, targetdir.resolve(SakerStandardUtils.getFileLocationFileName(flocation)));
+					addResourceToBuilder(taskbuilder, flocation,
+							targetdir.resolve(SakerStandardUtils.getFileLocationFileName(flocation)), compression);
 				}
 			}
 		} else {
@@ -156,13 +160,22 @@ public class SimpleZipResourcesTaskOption implements ZipResourcesTaskOption {
 							taskcontext.getTaskUtilities().reportInputFileDependency(null,
 									ObjectUtils.singleValueMap(filepaths, CommonTaskContentDescriptors.PRESENT));
 							for (SakerPath fp : filepaths) {
-								taskbuilder.addResource(ExecutionFileLocation.create(fp),
-										targetdir.resolve(dirpath.relativize(fp)));
+								addResourceToBuilder(taskbuilder, ExecutionFileLocation.create(fp),
+										targetdir.resolve(dirpath.relativize(fp)), compression);
 							}
 						}
 					});
 				}
 			}
+		}
+	}
+
+	protected static void addResourceToBuilder(ZipCreationTaskBuilder builder, FileLocation location, SakerPath path,
+			ZipCompressionTaskOption compression) {
+		if (compression == null) {
+			builder.addResource(location, path);
+		} else {
+			builder.addResource(location, SimpleZipCompressionTaskOption.createEntry(path, compression));
 		}
 	}
 

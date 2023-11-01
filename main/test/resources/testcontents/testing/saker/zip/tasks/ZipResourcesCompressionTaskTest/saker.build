@@ -1,0 +1,36 @@
+build(
+	out zip,
+	out zippath = $zip[Path],
+) {
+	$zip = saker.zip.create(
+		Output: output.zip, 
+		Resources: [
+			{
+				Resources: default*
+			}
+			{
+				Resources: stored*
+				Compression: STORED
+			}
+			{
+				Resources: deflated*
+				Compression: DEFLATED
+			}
+			{
+				Resources: deflevel0
+				Compression: "DEFLATED:0"
+			}
+			{
+				Resources: deflevel9
+				Compression: {
+					Method: DEFLATED
+					Level: 9
+				}
+			}
+			{	# only the compression level is given, will use DEFLATED
+				Resources: numdeflated
+				Compression: 5
+			}
+		]
+	)
+}
