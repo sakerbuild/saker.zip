@@ -22,7 +22,9 @@ import java.io.InputStream;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.attribute.FileTime;
+import java.security.MessageDigest;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -48,11 +50,14 @@ import saker.build.file.SakerDirectory;
 import saker.build.file.SakerFile;
 import saker.build.file.SakerFileBase;
 import saker.build.file.content.ContentDescriptor;
+import saker.build.file.content.EmptyContentDescriptor;
+import saker.build.file.content.HashContentDescriptor;
 import saker.build.file.content.MultiContentDescriptor;
 import saker.build.file.path.SakerPath;
 import saker.build.thirdparty.saker.util.ObjectUtils;
 import saker.build.thirdparty.saker.util.io.ByteArrayRegion;
 import saker.build.thirdparty.saker.util.io.ConcatInputStream;
+import saker.build.thirdparty.saker.util.io.FileUtils;
 import saker.build.thirdparty.saker.util.io.IOUtils;
 import saker.build.thirdparty.saker.util.io.SerialUtils;
 import saker.build.thirdparty.saker.util.io.StreamUtils;
@@ -194,10 +199,10 @@ public class ZipOutputSakerFile extends SakerFileBase {
 	protected ZipOutputSakerFile(String name, BuilderImpl builder)
 			throws NullPointerException, InvalidPathFormatException {
 		super(name);
+		this.files = builder.files.values();
 		ZipFileContentDescriptor contentdescriptor = new ZipFileContentDescriptor(
 				builder.getDefaultEntryModificationTime(), MultiContentDescriptor.create(builder.subContents),
-				builder.transformers);
-		this.files = builder.files.values();
+				getResourceEntriesContentDescriptor(this.files), builder.transformers);
 		this.includes = builder.includes;
 		this.contentDescriptor = contentdescriptor;
 	}
@@ -831,11 +836,47 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		return contentDescriptor.defaultEntryModificationTime;
 	}
 
+	/**
+	 * Creates a content descriptor that contains the information from the resource entries in the argument.
+	 */
+	private static ContentDescriptor getResourceEntriesContentDescriptor(Iterable<? extends IncludeFile> entries) {
+		//a hash content descriptor is created instead of storing each and every resource entry and checking for equality
+		Iterator<? extends IncludeFile> it = entries.iterator();
+		if (!it.hasNext()) {
+			return EmptyContentDescriptor.INSTANCE;
+		}
+
+		//buffer for other fields
+		byte[] buffer = new byte[Long.BYTES + Integer.BYTES * 2];
+		MessageDigest hasher = FileUtils.getDefaultFileHasher();
+		do {
+			IncludeFile incfile = it.next();
+			ZipResourceEntry entry = incfile.resourceEntry;
+			hasher.update(entry.getEntryPath().toString().getBytes(StandardCharsets.UTF_8));
+			FileTime modtime = entry.getModificationTime();
+			int idx = 0;
+			if (modtime != null) {
+				SerialUtils.writeLongToBuffer(modtime.toMillis(), buffer, idx);
+				idx += Long.BYTES;
+			}
+			int method = entry.getMethod();
+			int level = entry.getLevel();
+			SerialUtils.writeIntToBuffer(method, buffer, idx);
+			idx += Integer.BYTES;
+			SerialUtils.writeIntToBuffer(level, buffer, idx);
+			idx += Integer.BYTES;
+
+			hasher.update(buffer, 0, idx);
+		} while (it.hasNext());
+		return HashContentDescriptor.createWithHash(hasher.digest());
+	}
+
 	protected static class ZipFileContentDescriptor implements ContentDescriptor, Externalizable {
 		private static final long serialVersionUID = 1L;
 
 		protected FileTime defaultEntryModificationTime;
 		protected ContentDescriptor subContents;
+		protected ContentDescriptor entriesContents;
 		protected List<ZipResourceTransformerFactory> transformers;
 
 		/**
@@ -845,9 +886,10 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		}
 
 		public ZipFileContentDescriptor(FileTime defaultEntryModificationTime, ContentDescriptor subContents,
-				List<ZipResourceTransformerFactory> transformers) {
+				ContentDescriptor entriesContents, List<ZipResourceTransformerFactory> transformers) {
 			this.defaultEntryModificationTime = defaultEntryModificationTime;
 			this.subContents = subContents;
+			this.entriesContents = entriesContents;
 			this.transformers = transformers;
 		}
 
@@ -855,6 +897,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		public void writeExternal(ObjectOutput out) throws IOException {
 			out.writeLong(defaultEntryModificationTime.toMillis());
 			out.writeObject(subContents);
+			out.writeObject(entriesContents);
 			SerialUtils.writeExternalCollection(out, transformers);
 		}
 
@@ -862,6 +905,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
 			defaultEntryModificationTime = FileTime.fromMillis(in.readLong());
 			subContents = (ContentDescriptor) in.readObject();
+			entriesContents = (ContentDescriptor) in.readObject();
 			transformers = SerialUtils.readExternalImmutableList(in);
 		}
 
@@ -877,6 +921,9 @@ public class ZipOutputSakerFile extends SakerFileBase {
 			if (this.subContents.isChanged(zipcd.subContents)) {
 				return true;
 			}
+			if (this.entriesContents.isChanged(zipcd.entriesContents)) {
+				return true;
+			}
 			if (!Objects.equals(transformers, zipcd.transformers)) {
 				return true;
 			}
@@ -890,6 +937,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 			result = prime * result
 					+ ((defaultEntryModificationTime == null) ? 0 : defaultEntryModificationTime.hashCode());
 			result = prime * result + ((subContents == null) ? 0 : subContents.hashCode());
+			result = prime * result + ((entriesContents == null) ? 0 : entriesContents.hashCode());
 			result = prime * result + ((transformers == null) ? 0 : transformers.hashCode());
 			return result;
 		}
@@ -913,6 +961,11 @@ public class ZipOutputSakerFile extends SakerFileBase {
 					return false;
 			} else if (!subContents.equals(other.subContents))
 				return false;
+			if (entriesContents == null) {
+				if (other.entriesContents != null)
+					return false;
+			} else if (!entriesContents.equals(other.entriesContents))
+				return false;
 			if (transformers == null) {
 				if (other.transformers != null)
 					return false;
@@ -923,12 +976,17 @@ public class ZipOutputSakerFile extends SakerFileBase {
 
 		@Override
 		public String toString() {
-			return getClass().getSimpleName() + "["
-					+ (defaultEntryModificationTime != null
-							? "defaultEntryModificationTime=" + defaultEntryModificationTime + ", "
-							: "")
-					+ (subContents != null ? "subContents=" + subContents + ", " : "")
-					+ (transformers != null ? "transformers=" + transformers : "") + "]";
+			StringBuilder builder = new StringBuilder(getClass().getSimpleName());
+			builder.append("[defaultEntryModificationTime=");
+			builder.append(defaultEntryModificationTime);
+			builder.append(", subContents=");
+			builder.append(subContents);
+			builder.append(", entriesContents=");
+			builder.append(entriesContents);
+			builder.append(", transformers=");
+			builder.append(transformers);
+			builder.append("]");
+			return builder.toString();
 		}
 	}
 
