@@ -54,6 +54,10 @@ import saker.zip.api.create.ZipCreationTaskBuilder;
 		info = @NestInformation("Specifies the target directory under which the entries specified should be placed.\n"
 				+ "Any input entry that is matched by this configuration will have their archive paths prepended by the value of this field.\n"
 				+ "The specified path must be forward relative. By default, no target directory is used."))
+
+@NestFieldInformation(value = "Compression",
+		type = @NestTypeUsage(ZipCompressionTaskOption.class),
+		info = @NestInformation("Sets the compression that should be used for the included resources."))
 public interface ZipIncludeTaskOption {
 	public default ZipIncludeTaskOption clone() {
 		return new SimpleZipIncludeTaskOption(this);
