@@ -99,6 +99,7 @@ public interface IncludeResourceMapping {
 	 * @param directory
 	 *            <code>true</code> if the entry is a directory.
 	 * @return The entries that should be written in the created archive.
+	 * @since saker.zip 0.8.5
 	 */
 	public default Collection<? extends ZipResourceEntry> mapResource(ZipResourceEntry resourceentry,
 			boolean directory) {
