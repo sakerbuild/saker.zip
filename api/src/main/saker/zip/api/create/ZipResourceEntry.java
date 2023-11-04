@@ -32,6 +32,8 @@ public final class ZipResourceEntry implements Externalizable {
 
 	/**
 	 * For {@link Externalizable}.
+	 * 
+	 * @deprecated Don't use, this constructor is only to support {@link Externalizable} interface.
 	 */
 	@Deprecated
 	public ZipResourceEntry() {

@@ -16,7 +16,9 @@
 package saker.zip.api.create;
 
 import java.io.Externalizable;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 
@@ -73,7 +75,48 @@ public interface IncludeResourceMapping {
 	@Deprecated
 	public Set<SakerPath> mapResourcePath(SakerPath archivepath, boolean directory);
 
-	public Collection<? extends ZipResourceEntry> mapResource(ZipResourceEntry resourceentry, boolean directory);
+	/**
+	 * Maps a ZIP resource entry to zero, one, or more other other entries.
+	 * <p>
+	 * The method is called when an entry from another archive is being included in the created ZIP. The method should
+	 * return a collection of resource entries to which the entry should be written to. The result may be
+	 * <code>null</code>, empty collection, singleton collection, or can contain multiple result entries.
+	 * <p>
+	 * If the result is empty or <code>null</code>, the entry for the argument resource will <b>not</b> be part of the
+	 * created archive.
+	 * <p>
+	 * If the result contains one or more entries, then the entry will be written to the result archive multiple times
+	 * specifeid by their {@linkplain ZipResourceEntry#getEntryPath() entry paths}. This can be used to include an entry
+	 * multiple times with the same contents but different paths.
+	 * <p>
+	 * This method replaces the previous {@link #mapResourcePath(SakerPath, boolean)}. The default implementation calls
+	 * this method and returns a collection that has the same entry paths as returned by the
+	 * {@link #mapResource(ZipResourceEntry, boolean)} function, but all other {@link ZipResourceEntry} attributes are
+	 * taken from the argument.
+	 * 
+	 * @param resourceentry
+	 *            The archive resource entry that is being included.
+	 * @param directory
+	 *            <code>true</code> if the entry is a directory.
+	 * @return The entries that should be written in the created archive.
+	 */
+	public default Collection<? extends ZipResourceEntry> mapResource(ZipResourceEntry resourceentry,
+			boolean directory) {
+		SakerPath entrypath = resourceentry.getEntryPath();
+		Set<SakerPath> mapped = mapResourcePath(entrypath, directory);
+		if (mapped == null) {
+			return null;
+		}
+		List<ZipResourceEntry> result = new ArrayList<>();
+		for (SakerPath path : mapped) {
+			if (entrypath.equals(path)) {
+				result.add(resourceentry);
+			} else {
+				result.add(resourceentry.withEntryPath(path));
+			}
+		}
+		return result;
+	}
 
 	@Override
 	public int hashCode();
