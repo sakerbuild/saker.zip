@@ -23,7 +23,7 @@ import java.io.ObjectOutput;
 import saker.std.api.file.location.FileLocation;
 import saker.zip.api.create.IncludeResourceMapping;
 
-public class ZipIncludeArchiveOption implements Externalizable {
+public final class ZipIncludeArchiveOption implements Externalizable {
 	private static final long serialVersionUID = 1L;
 
 	private FileLocation archive;
