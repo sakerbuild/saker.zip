@@ -53,6 +53,7 @@ import saker.build.file.content.ContentDescriptor;
 import saker.build.file.content.EmptyContentDescriptor;
 import saker.build.file.content.HashContentDescriptor;
 import saker.build.file.content.MultiContentDescriptor;
+import saker.build.file.content.MultiPathContentDescriptor;
 import saker.build.file.path.SakerPath;
 import saker.build.thirdparty.saker.util.ObjectUtils;
 import saker.build.thirdparty.saker.util.io.ByteArrayRegion;
@@ -117,6 +118,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		protected Map<FileHandle, IncludeResourceMapping> includes = new LinkedHashMap<>();
 
 		protected Collection<ContentDescriptor> subContents = new ArrayList<>();
+		protected NavigableMap<SakerPath, ContentDescriptor> subEntryContents = new TreeMap<>();
 
 		protected FileTime defaultEntryModificationTime;
 
@@ -146,8 +148,12 @@ public class ZipOutputSakerFile extends SakerFileBase {
 			if (prevsw != null) {
 				throw new IllegalArgumentException("Duplicate ZIP entries: " + path);
 			}
-			EntryPathContentDescriptor entrypathcd = new EntryPathContentDescriptor(path, content);
-			this.subContents.add(entrypathcd);
+			ContentDescriptor prevcd = this.subEntryContents.putIfAbsent(path, content);
+			if (prevcd != null) {
+				//shouldn't happen
+				throw new IllegalArgumentException("Internal error, duplicate ZIP entry contents: " + path
+						+ " : previous: " + prevcd + " new: " + content);
+			}
 		}
 
 		@Override
@@ -161,7 +167,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 				throw new IllegalArgumentException("Multiple includes from archive: " + archivehandle + " with "
 						+ previnclude + " and " + resourcemappings);
 			}
-			subContents.add(archivecontents);
+			this.subContents.add(archivecontents);
 		}
 
 		@Override
@@ -202,6 +208,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		this.files = builder.files.values();
 		ZipFileContentDescriptor contentdescriptor = new ZipFileContentDescriptor(
 				builder.getDefaultEntryModificationTime(), MultiContentDescriptor.create(builder.subContents),
+				new MultiPathContentDescriptor(builder.subEntryContents),
 				getResourceEntriesContentDescriptor(this.files), builder.transformers);
 		this.includes = builder.includes;
 		this.contentDescriptor = contentdescriptor;
@@ -906,6 +913,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 
 		protected FileTime defaultEntryModificationTime;
 		protected ContentDescriptor subContents;
+		protected ContentDescriptor subPathContents;
 		protected ContentDescriptor entriesContents;
 		protected List<ZipResourceTransformerFactory> transformers;
 
@@ -916,9 +924,11 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		}
 
 		public ZipFileContentDescriptor(FileTime defaultEntryModificationTime, ContentDescriptor subContents,
-				ContentDescriptor entriesContents, List<ZipResourceTransformerFactory> transformers) {
+				ContentDescriptor subPathContents, ContentDescriptor entriesContents,
+				List<ZipResourceTransformerFactory> transformers) {
 			this.defaultEntryModificationTime = defaultEntryModificationTime;
 			this.subContents = subContents;
+			this.subPathContents = subPathContents;
 			this.entriesContents = entriesContents;
 			this.transformers = transformers;
 		}
@@ -927,6 +937,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		public void writeExternal(ObjectOutput out) throws IOException {
 			out.writeLong(defaultEntryModificationTime.toMillis());
 			out.writeObject(subContents);
+			out.writeObject(subPathContents);
 			out.writeObject(entriesContents);
 			SerialUtils.writeExternalCollection(out, transformers);
 		}
@@ -935,6 +946,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
 			defaultEntryModificationTime = FileTime.fromMillis(in.readLong());
 			subContents = (ContentDescriptor) in.readObject();
+			subPathContents = (ContentDescriptor) in.readObject();
 			entriesContents = (ContentDescriptor) in.readObject();
 			transformers = SerialUtils.readExternalImmutableList(in);
 		}
@@ -949,6 +961,9 @@ public class ZipOutputSakerFile extends SakerFileBase {
 				return true;
 			}
 			if (this.subContents.isChanged(zipcd.subContents)) {
+				return true;
+			}
+			if (this.subPathContents.isChanged(zipcd.subPathContents)) {
 				return true;
 			}
 			if (this.entriesContents.isChanged(zipcd.entriesContents)) {
@@ -967,6 +982,7 @@ public class ZipOutputSakerFile extends SakerFileBase {
 			result = prime * result
 					+ ((defaultEntryModificationTime == null) ? 0 : defaultEntryModificationTime.hashCode());
 			result = prime * result + ((subContents == null) ? 0 : subContents.hashCode());
+			result = prime * result + ((subPathContents == null) ? 0 : subPathContents.hashCode());
 			result = prime * result + ((entriesContents == null) ? 0 : entriesContents.hashCode());
 			result = prime * result + ((transformers == null) ? 0 : transformers.hashCode());
 			return result;
@@ -991,6 +1007,11 @@ public class ZipOutputSakerFile extends SakerFileBase {
 					return false;
 			} else if (!subContents.equals(other.subContents))
 				return false;
+			if (subPathContents == null) {
+				if (other.subPathContents != null)
+					return false;
+			} else if (!subPathContents.equals(other.subPathContents))
+				return false;
 			if (entriesContents == null) {
 				if (other.entriesContents != null)
 					return false;
@@ -1011,6 +1032,8 @@ public class ZipOutputSakerFile extends SakerFileBase {
 			builder.append(defaultEntryModificationTime);
 			builder.append(", subContents=");
 			builder.append(subContents);
+			builder.append(", subPathContents=");
+			builder.append(subPathContents);
 			builder.append(", entriesContents=");
 			builder.append(entriesContents);
 			builder.append(", transformers=");
@@ -1020,79 +1043,4 @@ public class ZipOutputSakerFile extends SakerFileBase {
 		}
 	}
 
-	private static class EntryPathContentDescriptor implements ContentDescriptor, Externalizable {
-		private static final long serialVersionUID = 1L;
-
-		private SakerPath path;
-		private ContentDescriptor content;
-
-		public EntryPathContentDescriptor() {
-		}
-
-		public EntryPathContentDescriptor(SakerPath path, ContentDescriptor content) {
-			this.path = path;
-			this.content = content;
-		}
-
-		@Override
-		public boolean isChanged(ContentDescriptor content) {
-			if (!ObjectUtils.isSameClass(this, content)) {
-				return true;
-			}
-			EntryPathContentDescriptor o = (EntryPathContentDescriptor) content;
-			if (!Objects.equals(path, o.path)) {
-				return true;
-			}
-			return this.content.isChanged(o.content);
-		}
-
-		@Override
-		public void writeExternal(ObjectOutput out) throws IOException {
-			out.writeObject(path);
-			out.writeObject(content);
-		}
-
-		@Override
-		public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-			path = (SakerPath) in.readObject();
-			content = (ContentDescriptor) in.readObject();
-		}
-
-		@Override
-		public int hashCode() {
-			final int prime = 31;
-			int result = 1;
-			result = prime * result + ((content == null) ? 0 : content.hashCode());
-			result = prime * result + ((path == null) ? 0 : path.hashCode());
-			return result;
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if (this == obj)
-				return true;
-			if (obj == null)
-				return false;
-			if (getClass() != obj.getClass())
-				return false;
-			EntryPathContentDescriptor other = (EntryPathContentDescriptor) obj;
-			if (content == null) {
-				if (other.content != null)
-					return false;
-			} else if (!content.equals(other.content))
-				return false;
-			if (path == null) {
-				if (other.path != null)
-					return false;
-			} else if (!path.equals(other.path))
-				return false;
-			return true;
-		}
-
-		@Override
-		public String toString() {
-			return getClass().getSimpleName() + "[" + (path != null ? "path=" + path + ", " : "")
-					+ (content != null ? "content=" + content : "") + "]";
-		}
-	}
 }
