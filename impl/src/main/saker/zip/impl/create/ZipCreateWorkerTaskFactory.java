@@ -23,6 +23,7 @@ import java.io.ObjectOutput;
 import java.nio.file.attribute.FileTime;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -270,7 +271,7 @@ public class ZipCreateWorkerTaskFactory
 		out.writeObject(outputPath);
 		out.writeObject(modificationTime);
 		SerialUtils.writeExternalCollection(out, includeOptions);
-		SerialUtils.writeExternalCollection(out, resourceOptions);
+		SerialUtils.writeExternalCollection(out, resourceOptions, ZipResourceOption::writeToExternal);
 		SerialUtils.writeExternalCollection(out, resourceTransformers);
 	}
 
@@ -279,7 +280,8 @@ public class ZipCreateWorkerTaskFactory
 		outputPath = (SakerPath) in.readObject();
 		modificationTime = (Date) in.readObject();
 		includeOptions = SerialUtils.readExternalImmutableLinkedHashSet(in);
-		resourceOptions = SerialUtils.readExternalImmutableLinkedHashSet(in);
+		resourceOptions = SerialUtils.readExternalCollection(new LinkedHashSet<>(), in,
+				ZipResourceOption::readFromExternal);
 		resourceTransformers = SerialUtils.readExternalImmutableList(in);
 	}
 

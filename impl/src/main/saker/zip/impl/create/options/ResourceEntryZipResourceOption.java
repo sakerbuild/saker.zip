@@ -1,8 +1,6 @@
 package saker.zip.impl.create.options;
 
-import java.io.Externalizable;
 import java.io.IOException;
-import java.io.ObjectInput;
 import java.io.ObjectOutput;
 import java.util.Objects;
 
@@ -10,17 +8,9 @@ import saker.std.api.file.location.FileLocation;
 import saker.zip.api.create.ZipResourceEntry;
 
 final class ResourceEntryZipResourceOption extends ZipResourceOption {
-	private static final long serialVersionUID = 1L;
-
 	private ZipResourceEntry resourceEntry;
 
-	/**
-	 * For {@link Externalizable}.
-	 */
-	public ResourceEntryZipResourceOption() {
-	}
-
-	public ResourceEntryZipResourceOption(FileLocation filePath, ZipResourceEntry resourceEntry) {
+	protected ResourceEntryZipResourceOption(FileLocation filePath, ZipResourceEntry resourceEntry) {
 		super(filePath);
 		this.resourceEntry = resourceEntry;
 	}
@@ -31,15 +21,9 @@ final class ResourceEntryZipResourceOption extends ZipResourceOption {
 	}
 
 	@Override
-	public void writeExternal(ObjectOutput out) throws IOException {
+	protected void writeExternal(ObjectOutput out) throws IOException {
 		super.writeExternal(out);
 		out.writeObject(resourceEntry);
-	}
-
-	@Override
-	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-		super.readExternal(in);
-		resourceEntry = (ZipResourceEntry) in.readObject();
 	}
 
 	@Override

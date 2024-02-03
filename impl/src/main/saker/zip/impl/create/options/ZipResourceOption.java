@@ -15,7 +15,6 @@
  */
 package saker.zip.impl.create.options;
 
-import java.io.Externalizable;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectOutput;
@@ -25,18 +24,11 @@ import saker.build.file.path.SakerPath;
 import saker.std.api.file.location.FileLocation;
 import saker.zip.api.create.ZipResourceEntry;
 
-public abstract class ZipResourceOption implements Externalizable {
-	private static final long serialVersionUID = 1L;
+public abstract class ZipResourceOption {
 
 	protected FileLocation fileLocation;
 
-	/**
-	 * For {@link Externalizable}.
-	 */
-	public ZipResourceOption() {
-	}
-
-	public ZipResourceOption(FileLocation filePath) {
+	protected ZipResourceOption(FileLocation filePath) {
 		this.fileLocation = filePath;
 	}
 
@@ -48,20 +40,37 @@ public abstract class ZipResourceOption implements Externalizable {
 		return new ResourceEntryZipResourceOption(filePath, resourceEntry);
 	}
 
+	// Optimized read and write functions to reduce the number of objects written to the output streams
+	// as we know all the subclasses and their serialization layouts
+
+	/**
+	 * Reads from an external object input based on the known layout of the {@link ZipResourceOption} implementations.
+	 */
+	public static ZipResourceOption readFromExternal(ObjectInput in) throws ClassNotFoundException, IOException {
+		FileLocation fileLocation = (FileLocation) in.readObject();
+		Object obj = in.readObject();
+		if (obj instanceof SakerPath) {
+			return new PathZipResourceOption(fileLocation, (SakerPath) obj);
+		}
+		return new ResourceEntryZipResourceOption(fileLocation, (ZipResourceEntry) obj);
+	}
+
+	/**
+	 * Writes the {@link ZipResourceOption} to the given {@link ObjectOutput} in a manner to be read using
+	 * {@link #readFromExternal(ObjectInput)}.
+	 */
+	public static void writeToExternal(ObjectOutput out, ZipResourceOption opt) throws IOException {
+		opt.writeExternal(out);
+	}
+
 	public FileLocation getFileLocation() {
 		return fileLocation;
 	}
 
 	public abstract ZipResourceEntry getArchiveResourceEntry();
 
-	@Override
-	public void writeExternal(ObjectOutput out) throws IOException {
+	protected void writeExternal(ObjectOutput out) throws IOException {
 		out.writeObject(fileLocation);
-	}
-
-	@Override
-	public void readExternal(ObjectInput in) throws IOException, ClassNotFoundException {
-		fileLocation = (FileLocation) in.readObject();
 	}
 
 	@Override
